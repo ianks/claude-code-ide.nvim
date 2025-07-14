@@ -1,0 +1,188 @@
+*claude-code.txt*    Neovim integration for Claude AI via Model Context Protocol
+
+==============================================================================
+CONTENTS                                                  *claude-code-contents*
+
+1. Introduction .................. |claude-code-introduction|
+2. Installation .................. |claude-code-installation|
+3. Configuration ................. |claude-code-configuration|
+4. Commands ...................... |claude-code-commands|
+5. Events ........................ |claude-code-events|
+6. API ........................... |claude-code-api|
+
+==============================================================================
+INTRODUCTION                                          *claude-code-introduction*
+
+claude-code.nvim integrates Claude AI directly into Neovim through the Model
+Context Protocol (MCP). It provides a WebSocket server that allows Claude CLI
+to connect and interact with your editor.
+
+Features:
+- WebSocket MCP server for Claude CLI integration
+- Automatic server discovery via lock files
+- Send code, diagnostics, and editor state to Claude
+- Interactive conversation window
+- Rich set of MCP tools for editor interaction
+- Secure authentication and localhost-only binding
+
+==============================================================================
+INSTALLATION                                          *claude-code-installation*
+
+Using lazy.nvim: >lua
+
+  -- First, install luarocks support for SHA1 dependency
+  {
+    "vhyrro/luarocks.nvim",
+    priority = 1001,
+    opts = {
+      rocks = { "sha1" }
+    }
+  },
+
+  -- Then install claude-code.nvim
+  {
+    "ianks/claude-code.nvim",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "vhyrro/luarocks.nvim",
+    },
+    config = function()
+      require("claude-code").setup({
+        -- Configuration options
+      })
+    end,
+  }
+<
+
+==============================================================================
+CONFIGURATION                                        *claude-code-configuration*
+
+Setup function accepts these options: >lua
+
+  require("claude-code").setup({
+    -- Server settings
+    port = 0,                    -- 0 for random port (10000-65535)
+    host = "127.0.0.1",         -- Localhost only for security
+    
+    -- Paths
+    lock_file_dir = vim.fn.expand("~/.claude/ide"),
+    
+    -- Server info
+    server_name = "claude-code.nvim",
+    server_version = "0.1.0",
+    
+    -- UI settings
+    ui = {
+      conversation = {
+        position = "right",
+        width = 80,
+        border = "rounded",
+      },
+    },
+    
+    -- Debug
+    debug = false,
+  })
+<
+
+==============================================================================
+COMMANDS                                                  *claude-code-commands*
+
+                                                            *:ClaudeCodeStart*
+:ClaudeCodeStart     Start the MCP server
+
+                                                             *:ClaudeCodeStop*
+:ClaudeCodeStop      Stop the MCP server
+
+                                                           *:ClaudeCodeToggle*
+:ClaudeCodeToggle    Toggle conversation window
+
+                                                           *:ClaudeCodeStatus*
+:ClaudeCodeStatus    Show server status
+
+                                                          *:ClaudeCodeRestart*
+:ClaudeCodeRestart   Restart the server
+
+                                                               *:ClaudeNew*
+:ClaudeNew           Start a new Claude session in terminal
+
+                                                            *:ClaudeToggle*
+:ClaudeToggle        Toggle Claude terminal
+
+==============================================================================
+EVENTS                                                      *claude-code-events*
+
+The plugin emits various events that you can listen to:
+
+                                              *claude-code:ServerStarted*
+ServerStarted        Emitted when the MCP server starts
+                     Data: { port = number, auth_token = string }
+
+                                              *claude-code:ServerStopped*
+ServerStopped        Emitted when the MCP server stops
+                     Data: { reason = string }
+
+                                           *claude-code:ClientConnected*
+ClientConnected      Emitted when a client connects
+                     Data: { client_id = string }
+
+                                        *claude-code:ClientDisconnected*
+ClientDisconnected   Emitted when a client disconnects
+                     Data: { client_id = string, reason = string }
+
+                                                *claude-code:RpcRequest*
+RpcRequest           Emitted for incoming RPC requests
+                     Data: { method = string, params = table, id = any }
+
+                                               *claude-code:RpcResponse*
+RpcResponse          Emitted for outgoing RPC responses
+                     Data: { result = any, error = table, id = any }
+
+                                            *claude-code:RpcNotification*
+RpcNotification      Emitted for incoming notifications
+                     Data: { method = string, params = table }
+
+                                              *claude-code:ToolExecuted*
+ToolExecuted         Emitted when a tool is executed
+                     Data: { tool = string, params = table, result = any }
+
+Example usage: >lua
+
+  local events = require("claude-code.events")
+  
+  -- Listen to server events
+  events.on("ServerStarted", function(data)
+    vim.notify("Claude server started on port " .. data.port)
+  end)
+  
+  -- Listen to all events
+  events.on("*", function(event, data)
+    print("Event:", event, vim.inspect(data))
+  end)
+<
+
+==============================================================================
+API                                                            *claude-code-api*
+
+                                                          *claude-code.setup()*
+setup({opts})        Configure the plugin
+                     Parameters: ~
+                       {opts}  Configuration table (optional)
+
+                                                          *claude-code.start()*
+start()              Start the MCP server
+                     Returns: ~
+                       Server instance
+
+                                                           *claude-code.stop()*
+stop()               Stop the MCP server
+
+                                                         *claude-code.status()*
+status()             Get server status
+                     Returns: ~
+                       Status table with running state and port
+
+                                                        *claude-code.restart()*
+restart()            Restart the MCP server
+
+vim:tw=78:ts=8:ft=help:norl:

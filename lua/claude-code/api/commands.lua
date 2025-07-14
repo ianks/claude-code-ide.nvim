@@ -33,6 +33,7 @@ function M.setup()
   vim.api.nvim_create_user_command("ClaudeCodeStatus", function()
     local claude = require("claude-code")
     local status = claude.status()
+    local server = require("claude-code.server").get_server()
     
     local lines = {
       "Claude Code Status:",
@@ -40,9 +41,14 @@ function M.setup()
       "  Server Running: " .. tostring(status.server_running),
     }
     
+    if server then
+      table.insert(lines, "  Port: " .. server.port)
+      table.insert(lines, "  Host: " .. server.host)
+      table.insert(lines, "  Clients: " .. vim.tbl_count(server.clients))
+    end
+    
     if status.config then
-      table.insert(lines, "  Port: " .. (status.config.server.port or "auto"))
-      table.insert(lines, "  Debug: " .. tostring(status.config.debug.enabled))
+      table.insert(lines, "  Debug: " .. tostring(status.config.debug or false))
     end
     
     vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)

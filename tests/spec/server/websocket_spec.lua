@@ -21,6 +21,7 @@ describe("websocket", function()
       
       assert.are.equal("GET", headers.method)
       assert.are.equal("/", headers.path)
+      assert.are.equal("localhost:54321", headers["host"])
       assert.are.equal("websocket", headers["upgrade"])
       assert.are.equal("Upgrade", headers["connection"])
       assert.are.equal("dGhlIHNhbXBsZSBub25jZQ==", headers["sec-websocket-key"])

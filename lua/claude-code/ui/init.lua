@@ -27,20 +27,48 @@ function M.open_conversation()
     return
   end
   
+  -- Get UI config with defaults
+  local ui_config = config.ui or {}
+  local conv_config = ui_config.conversation or {
+    position = "right",
+    width = 80,
+    border = "rounded"
+  }
+  
   -- Create buffer if needed
   if not state.conversation_buf or not vim.api.nvim_buf_is_valid(state.conversation_buf) then
     state.conversation_buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(state.conversation_buf, "Claude Conversation")
     vim.bo[state.conversation_buf].buftype = "nofile"
     vim.bo[state.conversation_buf].filetype = "markdown"
+    
+    -- Add some welcome content
+    local lines = {
+      "# Claude Code Conversation",
+      "",
+      "Welcome to Claude Code! This is where your conversation with Claude will appear.",
+      "",
+      "## Quick Start:",
+      "- Use `<leader>cs` to send selected text or current context to Claude",
+      "- Use `<leader>cd` to send diagnostics to Claude",  
+      "- Press `q` to close this window",
+      "",
+      "## Server Status:",
+      string.format("- Port: %d", require("claude-code.server").get_server().port),
+      string.format("- Status: %s", config.server_running and "Connected" or "Disconnected"),
+      "",
+      "---",
+      ""
+    }
+    vim.api.nvim_buf_set_lines(state.conversation_buf, 0, -1, false, lines)
   end
   
   -- Create window using snacks.nvim
   state.conversation_win = Snacks.win({
     buf = state.conversation_buf,
-    position = config.ui.conversation.position,
-    width = config.ui.conversation.width,
-    border = config.ui.conversation.border,
+    position = conv_config.position,
+    width = conv_config.width,
+    border = conv_config.border,
     title = "Claude Code",
     footer = "Press 'q' to close",
   })
