@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/sumneko/vscode-lua/master/setting/schema.json",
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "diagnostics": {
+    "globals": ["vim", "bit", "jit"],
+    "disable": ["lowercase-global"]
+  },
+  "workspace": {
+    "library": [
+      "$VIMRUNTIME/lua",
+      "${3rd}/luv/library"
+    ],
+    "checkThirdParty": false
+  },
+  "completion": {
+    "callSnippet": "Replace",
+    "keywordSnippet": "Replace"
+  },
+  "hint": {
+    "enable": true,
+    "arrayIndex": "Auto",
+    "setType": true
+  },
+  "format": {
+    "enable": true,
+    "defaultConfig": {
+      "indent_style": "space",
+      "indent_size": "2",
+      "continuation_indent_size": "2"
+    }
+  }
+}
