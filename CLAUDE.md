@@ -106,6 +106,26 @@ The project has two key specification documents:
 
 No implementation code exists yet. Development should start with the core MCP WebSocket server and lock file management.
 
+## Searching Documentation
+
+When searching for MCP protocol documentation or other technical specs:
+
+1. First check if the documentation is already indexed:
+   ```
+   mcp__docs-mcp-server__search_docs library="mcp" query="tools list"
+   ```
+
+2. If not indexed, scrape the documentation:
+   ```
+   mcp__docs-mcp-server__scrape_docs url="https://modelcontextprotocol.io" library="mcp" maxPages=500 maxDepth=10 scope="domain"
+   ```
+
+3. For the MCP protocol specification specifically:
+   - Main site: https://modelcontextprotocol.io
+   - Use `scope="domain"` to capture all subpages
+   - Increase `maxDepth` (default 3) to capture nested documentation
+   - Increase `maxPages` (default 1000) for comprehensive coverage
+
 ## Available Dependencies
 
 The following plugins are already available in the user's Neovim configuration and should be leveraged:

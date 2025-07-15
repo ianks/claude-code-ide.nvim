@@ -4,11 +4,11 @@ local M = {}
 
 -- JSON-RPC 2.0 error codes
 M.errors = {
-  PARSE_ERROR = -32700,
-  INVALID_REQUEST = -32600,
-  METHOD_NOT_FOUND = -32601,
-  INVALID_PARAMS = -32602,
-  INTERNAL_ERROR = -32603,
+	PARSE_ERROR = -32700,
+	INVALID_REQUEST = -32600,
+	METHOD_NOT_FOUND = -32601,
+	INVALID_PARAMS = -32602,
+	INTERNAL_ERROR = -32603,
 }
 
 -- Protocol version
@@ -18,22 +18,22 @@ M.VERSION = "2.0"
 ---@param message table Message to validate
 ---@return boolean valid
 function M.validate_message(message)
-  -- Must have jsonrpc version
-  if message.jsonrpc ~= M.VERSION then
-    return false
-  end
+	-- Must have jsonrpc version
+	if message.jsonrpc ~= M.VERSION then
+		return false
+	end
 
-  -- Request: must have method
-  if message.method then
-    return type(message.method) == "string"
-  end
+	-- Request: must have method
+	if message.method then
+		return type(message.method) == "string"
+	end
 
-  -- Response: must have result or error
-  if message.result ~= nil or message.error ~= nil then
-    return message.id ~= nil
-  end
+	-- Response: must have result or error
+	if message.result ~= nil or message.error ~= nil then
+		return message.id ~= nil
+	end
 
-  return false
+	return false
 end
 
 -- Create request object
@@ -42,17 +42,17 @@ end
 ---@param params table? Method parameters
 ---@return table request
 function M.create_request(id, method, params)
-  local request = {
-    jsonrpc = M.VERSION,
-    method = method,
-    id = id,
-  }
+	local request = {
+		jsonrpc = M.VERSION,
+		method = method,
+		id = id,
+	}
 
-  if params ~= nil then
-    request.params = params
-  end
+	if params ~= nil then
+		request.params = params
+	end
 
-  return request
+	return request
 end
 
 -- Create notification object
@@ -60,16 +60,16 @@ end
 ---@param params table? Method parameters
 ---@return table notification
 function M.create_notification(method, params)
-  local notification = {
-    jsonrpc = M.VERSION,
-    method = method,
-  }
+	local notification = {
+		jsonrpc = M.VERSION,
+		method = method,
+	}
 
-  if params ~= nil then
-    notification.params = params
-  end
+	if params ~= nil then
+		notification.params = params
+	end
 
-  return notification
+	return notification
 end
 
 -- Create response object
@@ -77,11 +77,11 @@ end
 ---@param result any Response result
 ---@return table response
 function M.create_response(id, result)
-  return {
-    jsonrpc = M.VERSION,
-    id = id,
-    result = result,
-  }
+	return {
+		jsonrpc = M.VERSION,
+		id = id,
+		result = result,
+	}
 end
 
 -- Create error response object
@@ -91,20 +91,20 @@ end
 ---@param data any? Additional error data
 ---@return table response
 function M.create_error_response(id, code, message, data)
-  local error = {
-    code = code,
-    message = message,
-  }
+	local error = {
+		code = code,
+		message = message,
+	}
 
-  if data ~= nil then
-    error.data = data
-  end
+	if data ~= nil then
+		error.data = data
+	end
 
-  return {
-    jsonrpc = M.VERSION,
-    id = id,
-    error = error,
-  }
+	return {
+		jsonrpc = M.VERSION,
+		id = id,
+		error = error,
+	}
 end
 
 return M

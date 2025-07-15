@@ -1,59 +1,47 @@
 # claude-code.nvim
 
-Neovim integration for Claude AI, enabling seamless interaction with Claude directly from your editor through the Model Context Protocol (MCP).
+Neovim plugin for Claude AI integration via Model Context Protocol (MCP).
 
-## ✨ Features
+## Features
 
-- 🔌 WebSocket MCP server for Claude CLI integration
-- 🔍 Automatic server discovery via lock files
-- 📝 Send code, diagnostics, and editor state to Claude
-- 💬 Interactive conversation window
-- 🛠️ Rich set of MCP tools for editor interaction
-- 🔒 Secure authentication and localhost-only binding
+- WebSocket MCP server for Claude CLI
+- Auto-discovery via lock files
+- Send code, diagnostics, and editor state to Claude
+- Interactive conversation window
+- Rich MCP tools for editor interaction
 
-## 📦 Installation
+## Installation
 
 Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
   "ianks/claude-code.nvim",
-  dependencies = {
-    "nvim-lua/plenary.nvim",
-  },
+  dependencies = { "nvim-lua/plenary.nvim" },
   config = function()
-    require("claude-code").setup({
-      -- Configuration options
-    })
+    require("claude-code").setup({})
   end,
 }
 ```
 
-**Note:** The plugin uses the system's `openssl` command for WebSocket handshake authentication.
+**Note:** Requires system `openssl` command.
 
-## 🚀 Quick Start
+## Quick Start
 
-1. Install the plugin using your package manager
-2. Start the MCP server: `:lua require("claude-code").start()`
-3. Launch Claude CLI with `claude --ide --debug`
-4. Claude will automatically discover and connect to your Neovim instance
+1. Install the plugin
+2. Start server: `:lua require("claude-code").start()`
+3. Run: `claude --ide`
+4. Claude auto-connects to Neovim
 
-## ⚙️ Configuration
+## Configuration
 
 ```lua
 require("claude-code").setup({
-  -- Server settings
-  port = 0,                    -- 0 for random port (10000-65535)
-  host = "127.0.0.1",         -- Localhost only for security
-  
-  -- Paths
+  port = 0,                    -- 0 for random port
+  host = "127.0.0.1",
   lock_file_dir = vim.fn.expand("~/.claude/ide"),
-  
-  -- Server info
   server_name = "claude-code.nvim",
   server_version = "0.1.0",
-  
-  -- UI settings
   ui = {
     conversation = {
       position = "right",
@@ -61,80 +49,39 @@ require("claude-code").setup({
       border = "rounded",
     },
   },
-  
-  -- Debug
   debug = false,
 })
 ```
 
-## 📋 Commands
+## Commands
 
-- `:ClaudeCodeStart` - Start the MCP server
-- `:ClaudeCodeStop` - Stop the MCP server
-- `:ClaudeCodeToggle` - Toggle conversation window
-- `:ClaudeCodeStatus` - Show server status
-- `:ClaudeCodeRestart` - Restart the server
+- `:ClaudeCodeStart` - Start server
+- `:ClaudeCodeStop` - Stop server
+- `:ClaudeCodeToggle` - Toggle conversation
+- `:ClaudeCodeStatus` - Show status
+- `:ClaudeCodeRestart` - Restart server
 
-## 🛠️ MCP Tools
-
-The plugin implements these MCP tools for Claude:
+## MCP Tools
 
 - `openFile` - Open files and select text
-- `openDiff` - Show diff views
+- `openDiff` - Show diffs
 - `getDiagnostics` - Get LSP diagnostics
 - `getCurrentSelection` - Get selected text
 - `getOpenEditors` - List open buffers
-- `getWorkspaceFolders` - Get workspace information
+- `getWorkspaceFolders` - Get workspace info
 
-## 🔧 Development
+## Development
 
-### Prerequisites
+**Requirements:** Neovim ≥ 0.9.0, Lua 5.1/LuaJIT
 
-- Neovim ≥ 0.9.0
-- Lua 5.1 or LuaJIT
-- Git CLI
+**Tests:** `just test`
 
-### Dependencies
+**Example:** See `examples/basic/init.lua`
 
-The plugin uses:
-- `plenary.nvim` - Essential utilities
-- `snacks.nvim` (optional) - For UI components
-- System `openssl` command - For WebSocket authentication
+## Contributing
 
-### Running Tests
+See `SPEC.md` and `CLAUDE.md`. Run tests before submitting.
 
-```bash
-just test                    # Run all tests
-just test-file <file>       # Run specific test file
-just test-verbose           # Run with verbose output
-```
+## License
 
-### Example Configuration
-
-See `examples/basic/init.lua` for a complete working configuration.
-
-## 📁 Project Structure
-
-```
-claude-code.nvim/
-├── lua/claude-code/         # Main plugin code
-│   ├── server/             # WebSocket MCP server
-│   ├── rpc.lua            # JSON-RPC protocol
-│   ├── tools.lua          # MCP tool implementations
-│   ├── events.lua         # Event system
-│   └── ui/                # UI components
-├── tests/                 # Test suite
-├── examples/              # Example configurations
-└── doc/                   # Documentation
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read:
-- `SPEC.md` - Technical specification
-- `CLAUDE.md` - Guidelines for AI assistance
-- Run tests with `just test` before submitting
-
-## 📄 License
-
-MIT License
+MIT

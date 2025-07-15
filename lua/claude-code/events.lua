@@ -10,14 +10,14 @@ local EVENT_PREFIX = "ClaudeCode"
 ---@param event string Event name (will be prefixed with "ClaudeCode:")
 ---@param data table? Optional data to pass with the event
 function M.emit(event, data)
-  -- Defer autocmd execution to avoid fast event context issues
-  vim.schedule(function()
-    vim.api.nvim_exec_autocmds("User", {
-      pattern = EVENT_PREFIX .. ":" .. event,
-      data = data,
-      modeline = false
-    })
-  end)
+	-- Defer autocmd execution to avoid fast event context issues
+	vim.schedule(function()
+		vim.api.nvim_exec_autocmds("User", {
+			pattern = EVENT_PREFIX .. ":" .. event,
+			data = data,
+			modeline = false,
+		})
+	end)
 end
 
 -- Subscribe to an event
@@ -26,16 +26,19 @@ end
 ---@param opts table? Optional options (group, once, desc)
 ---@return number autocmd_id The ID of the created autocmd
 function M.on(event, callback, opts)
-  opts = opts or {}
-  
-  local pattern = EVENT_PREFIX .. ":" .. event
-  
-  return vim.api.nvim_create_autocmd("User", vim.tbl_extend("force", {
-    pattern = pattern,
-    callback = function(args)
-      callback(args.data)
-    end,
-  }, opts))
+	opts = opts or {}
+
+	local pattern = EVENT_PREFIX .. ":" .. event
+
+	return vim.api.nvim_create_autocmd(
+		"User",
+		vim.tbl_extend("force", {
+			pattern = pattern,
+			callback = function(args)
+				callback(args.data)
+			end,
+		}, opts)
+	)
 end
 
 -- Subscribe to an event that fires only once
@@ -44,93 +47,93 @@ end
 ---@param opts table? Optional options (group, desc)
 ---@return number autocmd_id The ID of the created autocmd
 function M.once(event, callback, opts)
-  opts = opts or {}
-  opts.once = true
-  return M.on(event, callback, opts)
+	opts = opts or {}
+	opts.once = true
+	return M.on(event, callback, opts)
 end
 
 -- Unsubscribe from an event
 ---@param autocmd_id number The ID returned by on() or once()
 function M.off(autocmd_id)
-  pcall(vim.api.nvim_del_autocmd, autocmd_id)
+	pcall(vim.api.nvim_del_autocmd, autocmd_id)
 end
 
 -- Create an event group for better organization
 ---@param name string Group name
 ---@return number group_id The augroup ID
 function M.group(name)
-  return vim.api.nvim_create_augroup(EVENT_PREFIX .. "_" .. name, { clear = true })
+	return vim.api.nvim_create_augroup(EVENT_PREFIX .. "_" .. name, { clear = true })
 end
 
 -- Clear all event handlers in a group
 ---@param group_id number The group ID returned by group()
 function M.clear_group(group_id)
-  vim.api.nvim_clear_autocmds({ group = group_id })
+	vim.api.nvim_clear_autocmds({ group = group_id })
 end
 
 -- Common event names as constants for consistency
 M.events = {
-  -- Connection events
-  CONNECTED = "Connected",
-  DISCONNECTED = "Disconnected",
-  AUTHENTICATION_FAILED = "AuthenticationFailed",
-  
-  -- Tool events
-  TOOL_EXECUTING = "ToolExecuting",
-  TOOL_EXECUTED = "ToolExecuted",
-  TOOL_FAILED = "ToolFailed",
-  
-  -- Message events
-  MESSAGE_RECEIVED = "MessageReceived",
-  MESSAGE_SENT = "MessageSent",
-  REQUEST_STARTED = "RequestStarted",
-  REQUEST_COMPLETED = "RequestCompleted",
-  REQUEST_FAILED = "RequestFailed",
-  
-  -- File events
-  FILE_OPENED = "FileOpened",
-  DIFF_CREATED = "DiffCreated",
-  
-  -- Diagnostic events
-  DIAGNOSTICS_REQUESTED = "DiagnosticsRequested",
-  DIAGNOSTICS_PROVIDED = "DiagnosticsProvided",
-  
-  -- Server events
-  SERVER_STARTED = "ServerStarted",
-  SERVER_STOPPED = "ServerStopped",
-  CLIENT_CONNECTED = "ClientConnected",
-  CLIENT_DISCONNECTED = "ClientDisconnected",
-  
-  -- Initialization events
-  INITIALIZING = "Initializing",
-  INITIALIZED = "Initialized",
+	-- Connection events
+	CONNECTED = "Connected",
+	DISCONNECTED = "Disconnected",
+	AUTHENTICATION_FAILED = "AuthenticationFailed",
+
+	-- Tool events
+	TOOL_EXECUTING = "ToolExecuting",
+	TOOL_EXECUTED = "ToolExecuted",
+	TOOL_FAILED = "ToolFailed",
+
+	-- Message events
+	MESSAGE_RECEIVED = "MessageReceived",
+	MESSAGE_SENT = "MessageSent",
+	REQUEST_STARTED = "RequestStarted",
+	REQUEST_COMPLETED = "RequestCompleted",
+	REQUEST_FAILED = "RequestFailed",
+
+	-- File events
+	FILE_OPENED = "FileOpened",
+	DIFF_CREATED = "DiffCreated",
+
+	-- Diagnostic events
+	DIAGNOSTICS_REQUESTED = "DiagnosticsRequested",
+	DIAGNOSTICS_PROVIDED = "DiagnosticsProvided",
+
+	-- Server events
+	SERVER_STARTED = "ServerStarted",
+	SERVER_STOPPED = "ServerStopped",
+	CLIENT_CONNECTED = "ClientConnected",
+	CLIENT_DISCONNECTED = "ClientDisconnected",
+
+	-- Initialization events
+	INITIALIZING = "Initializing",
+	INITIALIZED = "Initialized",
 }
 
 -- Debug helper to log all events
 ---@param enabled boolean Enable or disable debug logging
 function M.debug(enabled)
-  if enabled then
-    -- Use native autocmd to capture event pattern correctly
-    M._debug_id = vim.api.nvim_create_autocmd("User", {
-      pattern = EVENT_PREFIX .. ":*",
-      callback = function(args)
-        local event_name = args.match:gsub("^" .. EVENT_PREFIX .. ":", "")
-        local event_data = args.data
-        
-        -- Format the debug message
-        local message = string.format("[ClaudeCode Event] %s", event_name)
-        if event_data ~= nil then
-          message = message .. ": " .. vim.inspect(event_data, { indent = "  " })
-        end
-        
-        vim.notify(message, vim.log.levels.DEBUG)
-      end,
-      desc = "Debug all ClaudeCode events"
-    })
-  elseif M._debug_id then
-    M.off(M._debug_id)
-    M._debug_id = nil
-  end
+	if enabled then
+		-- Use native autocmd to capture event pattern correctly
+		M._debug_id = vim.api.nvim_create_autocmd("User", {
+			pattern = EVENT_PREFIX .. ":*",
+			callback = function(args)
+				local event_name = args.match:gsub("^" .. EVENT_PREFIX .. ":", "")
+				local event_data = args.data
+
+				-- Format the debug message
+				local message = string.format("[ClaudeCode Event] %s", event_name)
+				if event_data ~= nil then
+					message = message .. ": " .. vim.inspect(event_data, { indent = "  " })
+				end
+
+				vim.notify(message, vim.log.levels.DEBUG)
+			end,
+			desc = "Debug all ClaudeCode events",
+		})
+	elseif M._debug_id then
+		M.off(M._debug_id)
+		M._debug_id = nil
+	end
 end
 
 return M
