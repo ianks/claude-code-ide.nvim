@@ -40,6 +40,17 @@ fmt:
 fmt-check:
     @command -v treefmt >/dev/null 2>&1 && treefmt --fail-on-change || echo "treefmt not installed - run 'nix develop'"
 
+# Run integration tests
+test-integration:
+    @./integration-test-runner.lua
+
+# Run specific integration test file
+test-integration-file FILE:
+    nvim --headless -u tests/integration_init.lua -c "lua require('plenary.busted').run('{{FILE}}')" -c "qa!"
+
+# Run all tests (unit + integration)
+test-all: test test-integration
+
 # Run all checks (tests, lint, format check, typecheck)
 check: test lint typecheck fmt-check
 
