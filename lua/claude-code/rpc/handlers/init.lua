@@ -9,7 +9,7 @@ local notification_handlers = {}
 -- Register all handlers
 function M.setup()
 	-- Core handlers
-	handlers["initialize"] = require("claude-code.rpc.handlers.initialize")
+	-- Initialize handler is defined in this module (see bottom)
 
 	-- These handlers are for non-MCP legacy methods
 	-- In MCP, all tool calls should go through tools/call
@@ -52,8 +52,9 @@ function M.setup()
 	-- Notification handlers
 	notification_handlers["initialized"] = function() end -- No-op
 	notification_handlers["notifications/initialized"] = function() end -- MCP protocol initialized notification
-	notification_handlers["textDocument/didOpen"] = require("claude-code.rpc.notifications").did_open
-	notification_handlers["textDocument/didChange"] = require("claude-code.rpc.notifications").did_change
+	-- TODO: Implement text document notifications when needed
+	-- notification_handlers["textDocument/didOpen"] = function() end
+	-- notification_handlers["textDocument/didChange"] = function() end
 end
 
 -- Get handler for method
@@ -83,6 +84,13 @@ end
 function M.initialize(rpc, params)
 	-- Store protocol version
 	rpc.protocol_version = params.protocolVersion or "2025-06-18"
+
+	-- Mark session as initialized
+	if rpc.session_id then
+		rpc.session.set_initialized(rpc.session_id)
+		rpc.session.set_session_data(rpc.session_id, "protocol_version", rpc.protocol_version)
+		rpc.session.set_session_data(rpc.session_id, "client_info", params.clientInfo)
+	end
 
 	-- Return server capabilities
 	return {

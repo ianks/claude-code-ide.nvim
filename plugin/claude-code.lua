@@ -22,9 +22,11 @@ vim.api.nvim_create_user_command("ClaudeCode", function(opts)
 		claude.stop()
 	elseif opts.args == "status" then
 		local status = claude.status()
-		vim.notify(vim.inspect(status), vim.log.levels.INFO)
+		local notify = require("claude-code.ui.notify")
+		notify.info(vim.inspect(status), { title = "Claude Code Status" })
 	else
-		vim.notify("Usage: :ClaudeCode [start|stop|status]", vim.log.levels.WARN)
+		local notify = require("claude-code.ui.notify")
+		notify.warn("Usage: :ClaudeCode [start|stop|status]")
 	end
 end, {
 	nargs = 1,

@@ -24,7 +24,7 @@ end)
 
 Subscribe to an event.
 
-- **event** (string): Event name or pattern (e.g., "ToolExecuted" or "*" for all)
+- **event** (string): Event name or pattern (e.g., "ToolExecuted" or "\*" for all)
 - **callback** (function): Function called when event fires, receives data as argument
 - **opts** (table?): Optional options (group, desc)
 - **Returns**: number - The autocmd ID for unsubscribing
@@ -252,10 +252,10 @@ vim.api.nvim_create_autocmd("User", {
 ## Best Practices
 
 1. **Use Groups**: Organize related event handlers in groups for easy management
-2. **Unsubscribe**: Remember to unsubscribe from events when no longer needed
-3. **Error Handling**: Wrap event handlers in pcall for robustness
-4. **Performance**: Avoid heavy operations in event handlers
-5. **Wildcards**: Use wildcard patterns sparingly as they receive all events
+1. **Unsubscribe**: Remember to unsubscribe from events when no longer needed
+1. **Error Handling**: Wrap event handlers in pcall for robustness
+1. **Performance**: Avoid heavy operations in event handlers
+1. **Wildcards**: Use wildcard patterns sparingly as they receive all events
 
 ## Debugging
 

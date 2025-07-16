@@ -2,6 +2,7 @@
 -- Integration between Claude AI and Neovim
 
 local M = {}
+local notify = require("claude-code.ui.notify")
 
 -- Module state
 M._state = {
@@ -14,7 +15,7 @@ M._state = {
 ---@param opts table? User configuration
 function M.setup(opts)
 	if M._state.initialized then
-		vim.notify("claude-code.nvim: Already initialized", vim.log.levels.WARN)
+		notify.warn("Already initialized")
 		return
 	end
 
@@ -26,6 +27,8 @@ function M.setup(opts)
 		lock_file_dir = vim.fn.expand("~/.claude/ide"),
 		server_name = "claude-code.nvim",
 		server_version = "0.1.0",
+		keymaps = {}, -- Default keymaps enabled
+		autocmds = {}, -- Default autocmds enabled
 	}, opts or {})
 
 	-- Set up logging
@@ -41,13 +44,37 @@ function M.setup(opts)
 		vim.g.claude_code_debug_log_file = M._state.config.debug_log_file
 	end
 
+	-- Setup keymaps unless disabled
+	if M._state.config.keymaps ~= false then
+		local keymaps = require("claude-code.keymaps")
+		keymaps.setup(M._state.config.keymaps)
+	end
+
+	-- Setup autocommands unless disabled
+	if M._state.config.autocmds ~= false then
+		local autocmds = require("claude-code.autocmds")
+		autocmds.setup(M._state.config.autocmds)
+	end
+
+	-- Setup resources system
+	local resources = require("claude-code.resources")
+	resources.setup()
+
+	-- Setup cache system
+	local cache = require("claude-code.cache")
+	cache.setup()
+
+	-- Setup statusline integration
+	local statusline = require("claude-code.statusline")
+	statusline.setup()
+
 	M._state.initialized = true
 end
 
 -- Start the server
 function M.start()
 	if not M._state.initialized then
-		vim.notify("claude-code.nvim: Call setup() first", vim.log.levels.ERROR)
+		notify.error("Call setup() first")
 		return
 	end
 
@@ -69,6 +96,20 @@ function M.stop()
 	local server = require("claude-code.server")
 	server.stop()
 	M._state.server = nil
+
+	-- Cleanup autocommands
+	if M._state.config and M._state.config.autocmds ~= false then
+		local autocmds = require("claude-code.autocmds")
+		autocmds.cleanup()
+	end
+
+	-- Cleanup statusline
+	local statusline = require("claude-code.statusline")
+	statusline.stop()
+
+	-- Shutdown cache system
+	local cache = require("claude-code.cache")
+	cache.shutdown()
 end
 
 -- Get current status

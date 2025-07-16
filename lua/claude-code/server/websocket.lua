@@ -3,6 +3,7 @@
 
 local events = require("claude-code.events")
 local log = require("claude-code.log")
+local notify = require("claude-code.ui.notify")
 
 local M = {}
 
@@ -101,7 +102,7 @@ function M._handle_handshake(connection)
 	})
 
 	-- Initialize RPC handler
-	local rpc = require("claude-code.rpc")
+	local rpc = require("claude-code.rpc.init")
 	connection.rpc = rpc.new(connection)
 end
 
@@ -330,10 +331,7 @@ function M._handle_frame(connection)
 
 			-- Process JSON-RPC message in async context to avoid fast event issues
 			vim.schedule(function()
-				local response = connection.rpc:process_message(data)
-				if response then
-					connection.rpc:send_response(response)
-				end
+				connection.rpc:process_message(data)
 			end)
 		elseif opcode == OPCODES.CLOSE then
 			-- Handle close frame
@@ -346,7 +344,7 @@ function M._handle_frame(connection)
 
 		-- If not FIN, we should accumulate frames (not implemented for simplicity)
 		if not fin then
-			vim.notify("Fragmented frames not supported", vim.log.levels.WARN)
+			notify.warn("Fragmented frames not supported")
 		end
 	end
 end
@@ -414,7 +412,7 @@ function M._close_connection(connection, reason)
 	end
 
 	if reason then
-		vim.notify("WebSocket connection closed: " .. reason, vim.log.levels.DEBUG)
+		notify.debug("WebSocket connection closed: " .. reason)
 	end
 end
 

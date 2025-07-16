@@ -2,6 +2,7 @@
 -- Uses native Neovim User autocmds for a lightweight pub/sub mechanism
 
 local M = {}
+local notify = require("claude-code.ui.notify")
 
 -- Event name prefix for all claude-code events
 local EVENT_PREFIX = "ClaudeCode"
@@ -10,6 +11,10 @@ local EVENT_PREFIX = "ClaudeCode"
 ---@param event string Event name (will be prefixed with "ClaudeCode:")
 ---@param data table? Optional data to pass with the event
 function M.emit(event, data)
+	if not event then
+		return
+	end
+
 	-- Defer autocmd execution to avoid fast event context issues
 	vim.schedule(function()
 		vim.api.nvim_exec_autocmds("User", {
@@ -92,6 +97,7 @@ M.events = {
 
 	-- File events
 	FILE_OPENED = "FileOpened",
+	FILE_FOCUSED = "FileFocused",
 	DIFF_CREATED = "DiffCreated",
 
 	-- Diagnostic events
@@ -107,6 +113,40 @@ M.events = {
 	-- Initialization events
 	INITIALIZING = "Initializing",
 	INITIALIZED = "Initialized",
+
+	-- Conversation events
+	CONVERSATION_SAVED = "ConversationSaved",
+
+	-- Progress events
+	PROGRESS_STARTED = "ProgressStarted",
+	PROGRESS_UPDATED = "ProgressUpdated",
+	PROGRESS_COMPLETED = "ProgressCompleted",
+
+	-- UI events
+	UI_CONVERSATION_OPENED = "UIConversationOpened",
+	UI_CONVERSATION_CLOSED = "UIConversationClosed",
+	LAYOUT_CHANGED = "LayoutChanged",
+	PANE_OPENED = "PaneOpened",
+	PANE_CLOSED = "PaneClosed",
+
+	-- Terminal events
+	TERMINAL_STARTED = "TerminalStarted",
+	TERMINAL_EXITED = "TerminalExited",
+
+	-- Queue events
+	REQUEST_QUEUED = "RequestQueued",
+	REQUEST_PROCESSING = "RequestProcessing",
+	REQUEST_PROGRESS = "RequestProgress",
+	REQUEST_CANCELLED = "RequestCancelled",
+	QUEUE_CLEARED = "QueueCleared",
+	QUEUE_REQUEST_COMPLETED = "QueueRequestCompleted",
+	QUEUE_REQUEST_FAILED = "QueueRequestFailed",
+
+	-- Session events
+	SESSION_CREATED = "SessionCreated",
+	SESSION_TERMINATED = "SessionTerminated",
+	SESSION_CONTEXT_ADDED = "SessionContextAdded",
+	SESSION_CONTEXT_REMOVED = "SessionContextRemoved",
 }
 
 -- Debug helper to log all events
@@ -126,7 +166,7 @@ function M.debug(enabled)
 					message = message .. ": " .. vim.inspect(event_data, { indent = "  " })
 				end
 
-				vim.notify(message, vim.log.levels.DEBUG)
+				notify.debug(message)
 			end,
 			desc = "Debug all ClaudeCode events",
 		})

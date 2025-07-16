@@ -1,5 +1,7 @@
 -- JSON-RPC 2.0 dispatcher for claude-code.nvim
 
+local log = require("claude-code.log")
+
 local M = {}
 M.__index = M
 
@@ -11,8 +13,12 @@ function M.new(connection)
 	self.connection = connection
 	self.handlers = require("claude-code.rpc.handlers")
 	self.protocol = require("claude-code.rpc.protocol")
+	self.session = require("claude-code.session")
 	self.pending_requests = {}
 	self.next_id = 1
+
+	-- Create session ID based on connection ID
+	self.session_id = connection.id or tostring(os.time())
 
 	-- Initialize the connection
 	self:_initialize()
@@ -163,6 +169,16 @@ end
 function M:_send(message)
 	local websocket = require("claude-code.server.websocket")
 	local json = vim.json.encode(message)
+
+	-- Log outgoing messages in debug mode
+	log.debug("RPC", "Sending response", {
+		method = message.method,
+		id = message.id,
+		has_result = message.result ~= nil,
+		has_error = message.error ~= nil,
+	})
+	log.trace("RPC", "Full response", { json = json })
+
 	websocket.send_text(self.connection, json)
 end
 

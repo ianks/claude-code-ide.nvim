@@ -1,2 +1,20 @@
 tmp/
 PLUGIN_GUIDE.md
+.direnv/
+.devenv*
+.pre-commit-config.yaml
+
+# Lock files
+~/.claude/ide/*.lock
+
+# Local test output
+test-output/
+*.log
+
+# Editor files
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

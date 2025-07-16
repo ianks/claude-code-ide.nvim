@@ -1,6 +1,7 @@
 -- Log-related commands for claude-code.nvim
 
 local M = {}
+local notify = require("claude-code.ui.notify")
 
 function M.setup()
 	local log = require("claude-code.log")
@@ -34,7 +35,7 @@ function M.setup()
 	-- Clear log file
 	vim.api.nvim_create_user_command("ClaudeCodeLogClear", function()
 		log.clear()
-		vim.notify("Claude Code log cleared", vim.log.levels.INFO)
+		notify.info("Claude Code log cleared")
 	end, { desc = "Clear Claude Code log file" })
 
 	-- Set log level
@@ -42,9 +43,9 @@ function M.setup()
 		local level = opts.args:upper()
 		if log.levels[level] then
 			log.set_level(level)
-			vim.notify("Claude Code log level set to " .. level, vim.log.levels.INFO)
+			notify.info("Claude Code log level set to " .. level)
 		else
-			vim.notify("Invalid log level. Use: TRACE, DEBUG, INFO, WARN, ERROR, or OFF", vim.log.levels.ERROR)
+			notify.error("Invalid log level. Use: TRACE, DEBUG, INFO, WARN, ERROR, or OFF")
 		end
 	end, {
 		desc = "Set Claude Code log level",
@@ -58,7 +59,7 @@ function M.setup()
 	vim.api.nvim_create_user_command("ClaudeCodeLogStatus", function()
 		local level = log.get_level()
 		local file = log.get_file()
-		vim.notify(string.format("Log level: %s\nLog file: %s", level, file), vim.log.levels.INFO)
+		notify.info(string.format("Log level: %s\nLog file: %s", level, file))
 	end, { desc = "Show Claude Code log status" })
 end
 

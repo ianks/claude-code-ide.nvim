@@ -1,0 +1,4 @@
+# Tests that need more work to fix hanging issues
+tests/spec/config_spec.lua
+tests/spec/terminal_spec.lua
+tests/spec/tools_execution_spec.lua

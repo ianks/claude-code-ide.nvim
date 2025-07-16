@@ -11,7 +11,8 @@ claude-code.nvim implements a Model Context Protocol (MCP) server that enables C
 The Neovim MCP server uses a lock file mechanism for discovery:
 
 1. **Lock File Location**: `~/.claude/ide/<port>.lock`
-2. **Lock File Content**:
+1. **Lock File Content**:
+
 ```json
 {
   "pid": <neovim_process_id>,
@@ -26,12 +27,12 @@ The Neovim MCP server uses a lock file mechanism for discovery:
 ### Connection Process
 
 1. **Start WebSocket Server**: Listen on `127.0.0.1` with a random port (10000-65535)
-2. **Generate Auth Token**: Create a UUID for authentication
-3. **Create Lock File**: Write server info to `~/.claude/ide/<port>.lock`
-4. **Set Environment Variables** (for Neovim terminal):
+1. **Generate Auth Token**: Create a UUID for authentication
+1. **Create Lock File**: Write server info to `~/.claude/ide/<port>.lock`
+1. **Set Environment Variables** (for Neovim terminal):
    - `ENABLE_IDE_INTEGRATION="true"`
    - `CLAUDE_CODE_SSE_PORT="<port>"`
-5. **WebSocket Authentication**: Validate `x-claude-code-ide-authorization` header
+1. **WebSocket Authentication**: Validate `x-claude-code-ide-authorization` header
 
 ## MCP Protocol Implementation
 
@@ -77,6 +78,7 @@ The Neovim MCP server uses a lock file mechanism for discovery:
 The server must implement these MCP tools:
 
 #### openFile
+
 Opens a file in Neovim and optionally selects text.
 
 ```typescript
@@ -98,6 +100,7 @@ Opens a file in Neovim and optionally selects text.
 ```
 
 #### openDiff
+
 Shows a diff view for file changes.
 
 ```typescript
@@ -118,6 +121,7 @@ Shows a diff view for file changes.
 ```
 
 #### getDiagnostics
+
 Returns LSP diagnostics.
 
 ```typescript
@@ -134,6 +138,7 @@ Returns LSP diagnostics.
 ```
 
 #### getCurrentSelection
+
 Returns current text selection.
 
 ```typescript
@@ -148,6 +153,7 @@ Returns current text selection.
 ```
 
 #### getOpenEditors
+
 Returns list of open buffers.
 
 ```typescript
@@ -162,6 +168,7 @@ Returns list of open buffers.
 ```
 
 #### getWorkspaceFolders
+
 Returns workspace folders.
 
 ```typescript
@@ -180,16 +187,16 @@ Returns workspace folders.
 ### Neovim Specifics
 
 1. Use `vim.uv` (libuv) for WebSocket server implementation
-2. Use `vim.json` for JSON serialization
-3. Handle tool calls through standard MCP tool execution flow
-4. Maintain compatibility with Neovim's async architecture using `plenary.async`
+1. Use `vim.json` for JSON serialization
+1. Handle tool calls through standard MCP tool execution flow
+1. Maintain compatibility with Neovim's async architecture using `plenary.async`
 
 ### Security
 
 1. Lock file must have 600 permissions
-2. Only bind to localhost (127.0.0.1)
-3. Validate auth token on WebSocket upgrade
-4. Validate all file paths before operations
+1. Only bind to localhost (127.0.0.1)
+1. Validate auth token on WebSocket upgrade
+1. Validate all file paths before operations
 
 ### Response Format
 
@@ -209,6 +216,7 @@ All tool responses follow MCP content format:
 ## Testing
 
 Use the Claude CLI with environment variables set:
+
 ```bash
 export ENABLE_IDE_INTEGRATION="true"
 export CLAUDE_CODE_SSE_PORT="<port>"

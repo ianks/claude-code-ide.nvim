@@ -1,6 +1,7 @@
 -- User commands for claude-code.nvim
 
 local M = {}
+local notify = require("claude-code.ui.notify")
 
 -- Setup user commands
 function M.setup()
@@ -51,7 +52,7 @@ function M.setup()
 			table.insert(lines, "  Debug: " .. tostring(status.config.debug or false))
 		end
 
-		vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+		notify.info(table.concat(lines, "\n"), { title = "Claude Code Status" })
 	end, {
 		desc = "Show Claude Code server status",
 	})
@@ -76,6 +77,47 @@ function M.setup()
 
 	-- Set up log commands
 	require("claude-code.api.log_commands").setup()
+
+	-- Command palette
+	vim.api.nvim_create_user_command("ClaudeCodePalette", function()
+		require("claude-code.ui.picker").show_commands()
+	end, {
+		desc = "Show Claude Code command palette",
+	})
+
+	-- Cache statistics
+	vim.api.nvim_create_user_command("ClaudeCodeCacheStats", function()
+		local cache = require("claude-code.cache")
+		local stats = cache.get_all_stats()
+
+		local lines = { "Cache Statistics:" }
+
+		for name, stat in pairs(stats) do
+			table.insert(lines, "")
+			table.insert(lines, "  " .. name .. ":")
+			table.insert(lines, "    Entries: " .. stat.total_entries .. "/" .. stat.max_size)
+			table.insert(lines, "    Expired: " .. stat.expired_entries)
+			table.insert(lines, "    Total Hits: " .. stat.total_hits)
+			table.insert(lines, "    Size: ~" .. math.floor(stat.estimated_size / 1024) .. "KB")
+		end
+
+		if vim.tbl_isempty(stats) then
+			table.insert(lines, "  No caches active")
+		end
+
+		notify.info(table.concat(lines, "\n"), { title = "Cache Statistics" })
+	end, {
+		desc = "Show cache statistics",
+	})
+
+	-- Clear cache
+	vim.api.nvim_create_user_command("ClaudeCodeCacheClear", function()
+		local cache = require("claude-code.cache")
+		cache.invalidate_all()
+		notify.info("All caches cleared", { title = "Cache Cleared" })
+	end, {
+		desc = "Clear all caches",
+	})
 end
 
 return M

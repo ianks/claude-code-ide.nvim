@@ -5,6 +5,8 @@ local uv = vim.loop
 local json = vim.json
 local events = require("claude-code.events")
 local log = require("claude-code.log")
+local notify = require("claude-code.ui.notify")
+local config = require("claude-code.config")
 
 local M = {}
 
@@ -57,7 +59,7 @@ function Server:start()
 	self.tcp_server:listen(128, function(err)
 		if err then
 			log.error("SERVER", "Failed to start server", { error = err })
-			vim.notify("Failed to start server: " .. err, vim.log.levels.ERROR)
+			notify.error("Failed to start server: " .. err)
 			return
 		end
 
@@ -76,9 +78,19 @@ function Server:start()
 		websocket.handle_connection(client, self)
 	end)
 
-	-- Set environment variables for Claude IDE integration
+	-- Set required environment variables for Claude IDE integration
 	vim.env.ENABLE_IDE_INTEGRATION = "true"
 	vim.env.CLAUDE_CODE_SSE_PORT = tostring(self.port)
+	vim.env.CLAUDECODE = "1"
+	vim.env.CLAUDE_CODE_ENTRYPOINT = "cli"
+
+	-- Log environment setup in debug mode
+	log.debug("SERVER", "Environment variables set", {
+		ENABLE_IDE_INTEGRATION = "true",
+		CLAUDE_CODE_SSE_PORT = tostring(self.port),
+		CLAUDECODE = "1",
+		CLAUDE_CODE_ENTRYPOINT = "cli",
+	})
 
 	-- Create lock file
 	local discovery = require("claude-code.discovery")
@@ -86,7 +98,10 @@ function Server:start()
 	self.lock_file_path = discovery.create_lock_file(self.port, self.auth_token, workspace)
 
 	self.running = true
-	vim.notify(string.format("MCP server started on port %d", self.port), vim.log.levels.INFO)
+	-- Only show notification in debug mode
+	if config.get("debug") then
+		notify.success(string.format("MCP server started on port %d", self.port))
+	end
 
 	-- Emit server started event
 	events.emit(events.events.SERVER_STARTED, {
@@ -121,7 +136,10 @@ function Server:stop()
 	end
 
 	self.running = false
-	vim.notify("MCP server stopped", vim.log.levels.INFO)
+	-- Only show notification in debug mode
+	if config.get("debug") then
+		notify.info("MCP server stopped")
+	end
 
 	-- Emit server stopped event
 	events.emit(events.events.SERVER_STOPPED, {

@@ -11,8 +11,8 @@ claude-code.nvim is a Neovim plugin that integrates Claude AI directly into the 
 The plugin implements a Model Context Protocol (MCP) server:
 
 1. **MCP Server**: A WebSocket-based MCP server running within Neovim (protocol version 2025-06-18)
-2. **Lock File Discovery**: Uses ~/.claude/ide/<port>.lock for server discovery
-3. **MCP Tools**: Implements tools for file operations, diagnostics, and editor state management
+1. **Lock File Discovery**: Uses ~/.claude/ide/<port>.lock for server discovery
+1. **MCP Tools**: Implements tools for file operations, diagnostics, and editor state management
 
 ## Key Components (Planned)
 
@@ -44,9 +44,14 @@ just test-file tests/spec/server/websocket_spec.lua
 
 # List all available commands
 just --list
+
+
+# Inspect claude code CLI implementation
+npx js-beautify /opt/homebrew/bin/claude | grep -A50 -B50 "<search_string>"
 ```
 
 The `just test` command is the core evaluation function for this project. It:
+
 - Runs all tests using Plenary's test framework
 - Provides consistent test execution across environments
 - Returns exit code 0 on success, 1 on failure
@@ -77,8 +82,8 @@ Critical tools from SPEC.md:
 **Always use `just test` to run tests. This is the canonical testing command.**
 
 1. Unit tests for MCP tool handlers using busted/plenary.nvim
-2. Integration tests with mock WebSocket connections
-3. Manual testing with Claude CLI integration
+1. Integration tests with mock WebSocket connections
+1. Manual testing with Claude CLI integration
 
 Test files go in `tests/spec/` and follow the pattern `*_spec.lua`. Tests use the Plenary test framework with busted-style assertions.
 
@@ -111,16 +116,19 @@ No implementation code exists yet. Development should start with the core MCP We
 When searching for MCP protocol documentation or other technical specs:
 
 1. First check if the documentation is already indexed:
+
    ```
    mcp__docs-mcp-server__search_docs library="mcp" query="tools list"
    ```
 
-2. If not indexed, scrape the documentation:
+1. If not indexed, scrape the documentation:
+
    ```
    mcp__docs-mcp-server__scrape_docs url="https://modelcontextprotocol.io" library="mcp" maxPages=500 maxDepth=10 scope="domain"
    ```
 
-3. For the MCP protocol specification specifically:
+1. For the MCP protocol specification specifically:
+
    - Main site: https://modelcontextprotocol.io
    - Use `scope="domain"` to capture all subpages
    - Increase `maxDepth` (default 3) to capture nested documentation
@@ -194,7 +202,8 @@ Since no WebSocket library is available, implement using `vim.uv` (libuv):
 ### Reference Implementation
 
 The VSCode extension implementation in "tmp/claude-code-vscode-extension-demangled.js" shows:
+
 - MCP server implementation using the `Ra` class
-- Lock file discovery mechanism 
+- Lock file discovery mechanism
 - WebSocket authentication flow
 - Tool registration patterns

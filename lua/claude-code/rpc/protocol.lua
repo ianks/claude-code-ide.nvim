@@ -77,6 +77,14 @@ end
 ---@param result any Response result
 ---@return table response
 function M.create_response(id, result)
+	-- Ensure result is never nil for successful responses
+	-- Use vim.empty_dict() for empty object responses
+	if result == nil then
+		result = vim.empty_dict()
+	elseif type(result) == "table" and vim.tbl_isempty(result) then
+		result = vim.empty_dict()
+	end
+
 	return {
 		jsonrpc = M.VERSION,
 		id = id,

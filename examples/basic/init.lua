@@ -124,8 +124,8 @@ require("lazy").setup({
 					},
 				},
 
-				-- Enable debug mode
-				debug = true,
+				-- Disable debug mode for quieter operation
+				debug = false,
 
 				-- Add debug logging to file
 				debug_log_file = vim.fn.expand("~/claude-code-debug.log"),
@@ -135,20 +135,7 @@ require("lazy").setup({
 			local server = claude.start()
 
 			if server then
-				-- Use snacks notifier for nice notifications
-				local Snacks = require("snacks")
-				Snacks.notify.info(
-					string.format("Claude Code server started on port %d", server.port),
-					{ title = "Claude Code" }
-				)
-
-				-- Show auth token in a separate notification
-				vim.defer_fn(function()
-					Snacks.notify.info(
-						string.format("Auth token: %s", server.auth_token),
-						{ title = "Claude Code", timeout = 10000 }
-					)
-				end, 500)
+				-- Server started successfully - no need for notifications
 
 				-- Setup file follower
 				local ok, file_follower = pcall(require, "examples.basic.file-follower")
@@ -158,26 +145,11 @@ require("lazy").setup({
 					})
 					-- Auto-enable file following
 					file_follower.enable()
-					Snacks.notify.info(
-						"Claude file following enabled - files opened by Claude will automatically open in Neovim",
-						{ title = "Claude Code" }
-					)
 				end
 
-				-- Automatically open Claude CLI in a terminal after a short delay
-				vim.defer_fn(function()
-					-- Use the ClaudeToggleTerm command we already defined
-					vim.cmd("ClaudeToggleTerm")
-
-					-- Also open the Claude conversation window
-					vim.defer_fn(function()
-						vim.cmd("ClaudeCodeToggle")
-						Snacks.notify.info(
-							"Claude is ready! Start typing to interact with Claude.",
-							{ title = "Claude Code", timeout = 5000 }
-						)
-					end, 1000)
-				end, 2000) -- Wait 2 seconds for server to fully initialize
+				-- Don't auto-open anything - let the user decide when to open Claude
+				-- Use <leader>cc to open the conversation window
+				-- Use <leader>ct to open the Claude terminal
 			end
 		end,
 		keys = {
@@ -264,12 +236,9 @@ events.on("Disconnected", function(data)
 	Snacks.notify.warn("Claude disconnected: " .. (data.reason or "unknown"), { title = "Claude Code" })
 end)
 
--- Tool execution tracking
-local tool_count = 0
+-- Tool execution is now tracked by the statusline module
 events.on("ToolExecuted", function(data)
-	tool_count = tool_count + 1
-	-- Don't spam notifications, just update a counter
-	vim.g.claude_tool_count = tool_count
+	-- The statusline module will handle display
 end)
 
 -- Show errors prominently
@@ -289,12 +258,11 @@ end)
 -- Enable this to see events
 events.debug(true)
 
--- Custom statusline component showing Claude status and tool count
+-- Custom statusline component showing Claude status
 vim.o.statusline = table.concat({
 	"%f %m", -- filename and modified flag
 	"%=", -- right align
-	"Tools: %{get(g:, 'claude_tool_count', 0)} ", -- tool execution count
-	'Claude: %{luaeval(\'require("claude-code").status().server_running and "●" or "○"\')} ', -- connection indicator
+	"%{luaeval('require(\"claude-code.statusline\").get_status()')} ", -- Claude status with messages
 	"%l:%c", -- line:column
 }, "")
 
@@ -337,6 +305,11 @@ vim.api.nvim_create_user_command("ClaudeNew", function()
 
 	-- Open and focus the terminal
 	term:toggle()
+
+	-- Start in insert mode
+	vim.schedule(function()
+		vim.cmd("startinsert")
+	end)
 
 	-- Notify user
 	local mode = vim.env.CLAUDE_CODE_DEBUG and "IDE + Debug mode" or "IDE mode"
@@ -387,9 +360,19 @@ vim.api.nvim_create_user_command("ClaudeToggleTerm", function()
 		})
 		-- Show it immediately after creation
 		claude_terminal:show()
+		-- Start in insert mode
+		vim.schedule(function()
+			vim.cmd("startinsert")
+		end)
 	else
 		-- Toggle the terminal
 		claude_terminal:toggle()
+		-- Start in insert mode if we're showing the terminal
+		vim.schedule(function()
+			if claude_terminal.win and vim.api.nvim_win_is_valid(claude_terminal.win) then
+				vim.cmd("startinsert")
+			end
+		end)
 	end
 end, { desc = "Toggle persistent Claude CLI terminal" })
 
@@ -408,7 +391,7 @@ vim.api.nvim_create_user_command("ClaudeInfo", function()
 			string.format("Running: %s", server.running and "yes" or "no"),
 			string.format("Clients: %d", vim.tbl_count(server.clients)),
 			"",
-			"Tools executed: " .. (vim.g.claude_tool_count or 0),
+			"Tools executed: " .. require("claude-code.statusline").get_tool_count(),
 		}
 
 		-- Create a floating window with the info

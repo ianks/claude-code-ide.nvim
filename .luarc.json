@@ -4,8 +4,14 @@
     "version": "LuaJIT"
   },
   "diagnostics": {
-    "globals": ["vim", "bit", "jit"],
-    "disable": ["lowercase-global"]
+    "globals": ["vim"],
+    "severity": {
+      "duplicate-set-field": "Warning",
+      "need-check-nil": "Warning",
+      "redundant-parameter": "Warning",
+      "undefined-global": "Error",
+      "unused-local": "Warning"
+    }
   },
   "workspace": {
     "library": [
@@ -14,21 +20,14 @@
     ],
     "checkThirdParty": false
   },
-  "completion": {
-    "callSnippet": "Replace",
-    "keywordSnippet": "Replace"
+  "format": {
+    "enable": false
   },
   "hint": {
     "enable": true,
-    "arrayIndex": "Auto",
-    "setType": true
-  },
-  "format": {
-    "enable": true,
-    "defaultConfig": {
-      "indent_style": "space",
-      "indent_size": "2",
-      "continuation_indent_size": "2"
-    }
+    "setType": true,
+    "paramType": true,
+    "paramName": "All",
+    "semicolon": "Disable"
   }
 }

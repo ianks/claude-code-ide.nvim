@@ -6,7 +6,7 @@ default:
 
 # Run all tests
 test:
-    nvim --headless -u tests/minimal_init.lua -c "PlenaryBustedDirectory tests/spec/ {minimal_init = 'tests/minimal_init.lua'}" -c "qa!"
+    @./test-runner.lua
 
 # Run tests with output
 test-verbose:
@@ -24,9 +24,24 @@ test-websocket:
 lint:
     @command -v luacheck >/dev/null 2>&1 && luacheck lua/ || echo "luacheck not installed"
 
+# Type check with lua-language-server
+typecheck:
+    @command -v lua-language-server >/dev/null 2>&1 && lua-language-server --check . || echo "lua-language-server not installed - run 'nix develop'"
+
 # Format code with stylua (if installed)
 format:
     @command -v stylua >/dev/null 2>&1 && stylua lua/ tests/ || echo "stylua not installed"
+
+# Format all files with treefmt
+fmt:
+    @command -v treefmt >/dev/null 2>&1 && treefmt || echo "treefmt not installed - run 'nix develop' or 'nix fmt'"
+
+# Check formatting with treefmt
+fmt-check:
+    @command -v treefmt >/dev/null 2>&1 && treefmt --fail-on-change || echo "treefmt not installed - run 'nix develop'"
+
+# Run all checks (tests, lint, format check, typecheck)
+check: test lint typecheck fmt-check
 
 # Clean any generated files
 clean:

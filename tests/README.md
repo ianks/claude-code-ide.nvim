@@ -36,18 +36,21 @@ just test-verbose
 
 1. **Declarative Testing**: The MCP server specification is written declaratively, separate from implementation details. This makes it easy to update specs without changing test logic.
 
-2. **Protocol Compliance**: Tests verify compliance with MCP protocol version 2025-06-18, including:
+1. **Protocol Compliance**: Tests verify compliance with MCP protocol version 2025-06-18, including:
+
    - JSON-RPC 2.0 message format
    - Initialization flow
    - Tool registration and execution
    - Error handling
 
-3. **Mock Infrastructure**: Comprehensive mocks for testing without real network connections:
+1. **Mock Infrastructure**: Comprehensive mocks for testing without real network connections:
+
    - Mock MCP server
    - Mock MCP client
    - Full protocol simulation
 
-4. **Security Testing**: Verifies security requirements:
+1. **Security Testing**: Verifies security requirements:
+
    - Lock file permissions (600)
    - Authentication token validation
    - Localhost-only binding
@@ -57,6 +60,7 @@ just test-verbose
 ### Adding a New Tool
 
 1. Add the tool to `mcp_server_spec.lua`:
+
 ```lua
 spec.tool("myNewTool", {
   description = "Description of the tool",
@@ -73,7 +77,7 @@ spec.tool("myNewTool", {
 ```
 
 2. Add the tool to the mock server in `mock_mcp_client.lua`
-3. Write protocol flow tests in `mcp_protocol_flow_spec.lua`
+1. Write protocol flow tests in `mcp_protocol_flow_spec.lua`
 
 ### Testing Implementation
 
