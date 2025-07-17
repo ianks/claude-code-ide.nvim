@@ -387,7 +387,7 @@ describe("Tools Integration", function()
 					assert.equals("DIFF_REJECTED", result.content[1].text)
 
 					-- But pending diff should be tracked
-					local sessions = require("claude-code.session").get_all_sessions()
+					local sessions = require("claude-code-ide.session").get_all_sessions()
 					local session = nil
 					for _, s in pairs(sessions) do
 						if s.client_id == client.next_id then

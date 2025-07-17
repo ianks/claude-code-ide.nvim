@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide helps you diagnose and fix common issues with claude-code.nvim.
+This guide helps you diagnose and fix common issues with claude-code-ide.nvim.
 
 ## Common Issues
 
@@ -18,7 +18,7 @@ This guide helps you diagnose and fix common issues with claude-code.nvim.
 
    ```vim
    :ClaudeCodeLogSet DEBUG
-   :lua require("claude-code").start()
+   :lua require("claude-code-ide").start()
    :ClaudeCodeLogShow
    ```
 
@@ -35,7 +35,7 @@ This guide helps you diagnose and fix common issues with claude-code.nvim.
 1. **Try a specific port**
 
    ```lua
-   require("claude-code").setup({
+   require("claude-code-ide").setup({
      port = 12345  -- Use a specific port instead of random
    })
    ```
@@ -94,14 +94,14 @@ This guide helps you diagnose and fix common issues with claude-code.nvim.
 1. **Check tool registration**
 
    ```lua
-   local tools = require("claude-code.tools")
+   local tools = require("claude-code-ide.tools")
    vim.print(tools.list())
    ```
 
 1. **Test tools manually**
 
    ```lua
-   local tools = require("claude-code.tools")
+   local tools = require("claude-code-ide.tools")
    local result = tools.execute("openFile", {
      filePath = vim.fn.expand("%:p")
    })
@@ -132,7 +132,7 @@ This guide helps you diagnose and fix common issues with claude-code.nvim.
 1. **Fall back to basic UI**
 
    ```lua
-   require("claude-code").setup({
+   require("claude-code-ide").setup({
      ui = {
        use_snacks = false  -- Disable Snacks.nvim
      }
@@ -167,7 +167,7 @@ This guide helps you diagnose and fix common issues with claude-code.nvim.
 1. **Adjust performance settings**
 
    ```lua
-   require("claude-code").setup({
+   require("claude-code-ide").setup({
      performance = {
        queue = {
          max_concurrent = 1,  -- Reduce concurrent requests
@@ -183,7 +183,7 @@ This guide helps you diagnose and fix common issues with claude-code.nvim.
 1. **Disable features**
 
    ```lua
-   require("claude-code").setup({
+   require("claude-code-ide").setup({
      progress = { enabled = false },
      autocmds = false
    })
@@ -194,7 +194,7 @@ This guide helps you diagnose and fix common issues with claude-code.nvim.
 ### Enable Debug Logging
 
 ```lua
-require("claude-code").setup({
+require("claude-code-ide").setup({
   debug = true,
   log = {
     level = "DEBUG"
@@ -212,7 +212,7 @@ require("claude-code").setup({
 ### Log File Location
 
 ```vim
-:echo stdpath("data") . "/claude-code.log"
+:echo stdpath("data") . "/claude-code-ide.log"
 ```
 
 ### Common Log Patterns
@@ -285,7 +285,7 @@ local function health_check()
   end
   
   -- Check server
-  local server = require("claude-code.server").get_server()
+  local server = require("claude-code-ide.server").get_server()
   if server and server.running then
     table.insert(messages, "OK: Server running on port " .. server.port)
   else
@@ -323,7 +323,7 @@ health_check()
 
 1. **Search existing issues**
 
-   - https://github.com/ianks/claude-code.nvim/issues
+   - https://github.com/ianks/claude-code-ide.nvim/issues
 
 1. **Create a new issue with:**
 
@@ -340,7 +340,7 @@ If the plugin becomes unresponsive:
 1. **Force stop the server**
 
    ```vim
-   :lua require("claude-code.server").stop()
+   :lua require("claude-code-ide.server").stop()
    ```
 
 1. **Clear all state**

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# Run tests for claude-code.nvim
+# Run tests for claude-code-ide.nvim
 set -e
 
-echo "Running claude-code.nvim tests..."
+echo "Running claude-code-ide.nvim tests..."
 
 # Check if plenary is available
 if ! nvim --headless -c "lua require('plenary')" -c "q" 2>/dev/null; then

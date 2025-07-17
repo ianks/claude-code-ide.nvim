@@ -1,6 +1,6 @@
 -- Tests for MCP resources implementation
 
-local resources = require("claude-code.resources")
+local resources = require("claude-code-ide.resources")
 
 describe("MCP Resources", function()
 	before_each(function()

@@ -1,20 +1,20 @@
--- Clean configuration for claude-code.nvim
+-- Clean configuration for claude-code-ide.nvim
 -- No auto-open windows, no notifications, just the essentials
 
 return {
-	"ianks/claude-code.nvim",
+	"ianks/claude-code-ide.nvim",
 	dependencies = {
 		"nvim-lua/plenary.nvim",
 		"folke/snacks.nvim", -- For the best UI experience
 	},
 	config = function()
-		require("claude-code").setup({
+		require("claude-code-ide").setup({
 			-- All defaults, no customization needed
 		})
 
 		-- Optionally start the server automatically (silent)
 		-- vim.defer_fn(function()
-		--   require("claude-code").start()
+		--   require("claude-code-ide").start()
 		-- end, 100)
 	end,
 	keys = {

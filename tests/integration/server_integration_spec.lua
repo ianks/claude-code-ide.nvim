@@ -1,4 +1,4 @@
--- Integration tests for claude-code server
+-- Integration tests for claude-code-ide server
 -- Tests real WebSocket connections and MCP protocol flow
 
 local helpers = require("tests.integration.helpers.setup")
@@ -43,7 +43,7 @@ describe("Server Integration", function()
 			-- Verify response
 			local result = helpers.assert_successful_response(response)
 			assert.equals("2025-06-18", result.protocolVersion)
-			assert.equals("claude-code.nvim", result.serverInfo.name)
+			assert.equals("claude-code-ide.nvim", result.serverInfo.name)
 			assert.truthy(result.serverInfo.version)
 			assert.truthy(result.capabilities)
 

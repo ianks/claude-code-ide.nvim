@@ -181,7 +181,7 @@ function MockClient:request(method, params)
 					resources = { listChanged = true },
 				},
 				serverInfo = {
-					name = "claude-code.nvim",
+					name = "claude-code-ide.nvim",
 					version = "0.1.0",
 				},
 				instructions = "Neovim MCP server for Claude integration",

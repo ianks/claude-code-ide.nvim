@@ -1,7 +1,7 @@
 -- Tests for progress indicators and animations
 
-local progress = require("claude-code.ui.progress")
-local events = require("claude-code.events")
+local progress = require("claude-code-ide.ui.progress")
+local events = require("claude-code-ide.events")
 
 describe("Progress Indicators", function()
 	local captured_events = {}

@@ -1,8 +1,8 @@
-# claude-code.nvim MCP Server Specification
+# claude-code-ide.nvim MCP Server Specification
 
 ## Overview
 
-claude-code.nvim implements a Model Context Protocol (MCP) server that enables Claude CLI to interact with Neovim. The server follows the [MCP specification version 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18).
+claude-code-ide.nvim implements a Model Context Protocol (MCP) server that enables Claude CLI to interact with Neovim. The server follows the [MCP specification version 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18).
 
 ## Discovery & Connection
 
@@ -64,7 +64,7 @@ The Neovim MCP server uses a lock file mechanism for discovery:
       "resources": { "listChanged": true }
     },
     "serverInfo": {
-      "name": "claude-code.nvim",
+      "name": "claude-code-ide.nvim",
       "version": "0.1.0"
     },
     "instructions": "Neovim MCP server for Claude integration"

@@ -1,10 +1,10 @@
 # API Documentation
 
-This document describes the public APIs available in claude-code.nvim for extending and customizing the plugin.
+This document describes the public APIs available in claude-code-ide.nvim for extending and customizing the plugin.
 
 ## Core Module
 
-### `require("claude-code")`
+### `require("claude-code-ide")`
 
 The main module for plugin management.
 
@@ -15,7 +15,7 @@ The main module for plugin management.
 Initialize the plugin with configuration options.
 
 ```lua
-require("claude-code").setup({
+require("claude-code-ide").setup({
   -- configuration options
 })
 ```
@@ -25,7 +25,7 @@ require("claude-code").setup({
 Start the MCP server.
 
 ```lua
-require("claude-code").start()
+require("claude-code-ide").start()
 ```
 
 ##### `stop()`
@@ -33,7 +33,7 @@ require("claude-code").start()
 Stop the MCP server.
 
 ```lua
-require("claude-code").stop()
+require("claude-code-ide").stop()
 ```
 
 ##### `status()`
@@ -41,7 +41,7 @@ require("claude-code").stop()
 Get current plugin status.
 
 ```lua
-local status = require("claude-code").status()
+local status = require("claude-code-ide").status()
 -- Returns: {
 --   initialized = boolean,
 --   server_running = boolean,
@@ -51,7 +51,7 @@ local status = require("claude-code").status()
 
 ## Tools Module
 
-### `require("claude-code.tools")`
+### `require("claude-code-ide.tools")`
 
 Register and manage MCP tools.
 
@@ -62,7 +62,7 @@ Register and manage MCP tools.
 Register a custom tool.
 
 ```lua
-local tools = require("claude-code.tools")
+local tools = require("claude-code-ide.tools")
 
 tools.register("myCustomTool", {
   description = "My custom tool description",
@@ -118,7 +118,7 @@ local all_tools = tools.list()
 
 ## Resources Module
 
-### `require("claude-code.resources")`
+### `require("claude-code-ide.resources")`
 
 Manage MCP resources.
 
@@ -129,7 +129,7 @@ Manage MCP resources.
 Register a custom resource.
 
 ```lua
-local resources = require("claude-code.resources")
+local resources = require("claude-code-ide.resources")
 
 resources.register(
   "custom://my-resource",
@@ -182,7 +182,7 @@ local lua_files = resources.list({ pattern = "%.lua$" })
 
 ## Events Module
 
-### `require("claude-code.events")`
+### `require("claude-code-ide.events")`
 
 Event system for plugin lifecycle.
 
@@ -193,7 +193,7 @@ Event system for plugin lifecycle.
 Subscribe to an event.
 
 ```lua
-local events = require("claude-code.events")
+local events = require("claude-code-ide.events")
 
 events.on(events.events.CLIENT_CONNECTED, function(data)
   print("Client connected:", data.client_id)
@@ -263,7 +263,7 @@ events.events = {
 
 ## Cache Module
 
-### `require("claude-code.cache")`
+### `require("claude-code-ide.cache")`
 
 Cache management for performance optimization.
 
@@ -274,7 +274,7 @@ Cache management for performance optimization.
 Get or create a named cache instance.
 
 ```lua
-local cache = require("claude-code.cache")
+local cache = require("claude-code-ide.cache")
 
 local my_cache = cache.get_cache("my_cache", {
   max_size = 100,
@@ -304,7 +304,7 @@ my_cache:cleanup()
 
 ## UI Module
 
-### `require("claude-code.ui")`
+### `require("claude-code-ide.ui")`
 
 User interface management.
 
@@ -315,7 +315,7 @@ User interface management.
 Toggle the conversation window.
 
 ```lua
-require("claude-code.ui").toggle_conversation()
+require("claude-code-ide.ui").toggle_conversation()
 ```
 
 ##### `send_message(text)`
@@ -323,7 +323,7 @@ require("claude-code.ui").toggle_conversation()
 Send a message to Claude.
 
 ```lua
-require("claude-code.ui").send_message("Hello Claude!")
+require("claude-code-ide.ui").send_message("Hello Claude!")
 ```
 
 ##### `clear_conversation()`
@@ -331,7 +331,7 @@ require("claude-code.ui").send_message("Hello Claude!")
 Clear the current conversation.
 
 ```lua
-require("claude-code.ui").clear_conversation()
+require("claude-code-ide.ui").clear_conversation()
 ```
 
 ##### `show_diagnostics()`
@@ -339,12 +339,12 @@ require("claude-code.ui").clear_conversation()
 Send workspace diagnostics to Claude.
 
 ```lua
-require("claude-code.ui").show_diagnostics()
+require("claude-code-ide.ui").show_diagnostics()
 ```
 
 ## Configuration Module
 
-### `require("claude-code.config")`
+### `require("claude-code-ide.config")`
 
 Access and modify configuration at runtime.
 
@@ -355,7 +355,7 @@ Access and modify configuration at runtime.
 Get a configuration value.
 
 ```lua
-local config = require("claude-code.config")
+local config = require("claude-code-ide.config")
 local ui_config = config.get("ui")
 ```
 
@@ -392,8 +392,8 @@ Here's a complete example of creating a custom tool:
 
 ```lua
 -- In your config or a separate module
-local tools = require("claude-code.tools")
-local notify = require("claude-code.ui.notify")
+local tools = require("claude-code-ide.tools")
+local notify = require("claude-code-ide.ui.notify")
 
 -- Register a tool to count lines in a file
 tools.register("countLines", {
@@ -455,7 +455,7 @@ end)
 
 ```lua
 -- Register a resource that provides project statistics
-local resources = require("claude-code.resources")
+local resources = require("claude-code-ide.resources")
 
 resources.register(
   "project://stats",

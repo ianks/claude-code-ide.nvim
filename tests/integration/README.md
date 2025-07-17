@@ -1,6 +1,6 @@
 # Integration Tests
 
-This directory contains integration tests for claude-code.nvim that test real components with minimal mocking.
+This directory contains integration tests for claude-code-ide.nvim that test real components with minimal mocking.
 
 ## Philosophy
 

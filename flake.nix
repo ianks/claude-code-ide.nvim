@@ -1,5 +1,5 @@
 {
-  description = "claude-code.nvim - Neovim plugin for Claude AI integration";
+  description = "claude-code-ide.nvim - Neovim plugin for Claude AI integration";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -76,7 +76,7 @@
           ];
 
           shellHook = ''
-            echo "🚀 claude-code.nvim development environment"
+            echo "🚀 claude-code-ide.nvim development environment"
             echo ""
             echo "Available commands:"
             echo "  just         - Run project tasks"

@@ -1,4 +1,4 @@
-# Justfile for claude-code.nvim
+# Justfile for claude-code-ide.nvim
 
 # Default recipe
 default:
@@ -62,7 +62,7 @@ clean:
 
 # Start development server (when implemented)
 dev:
-    nvim -c "lua require('claude-code').setup({ debug = true })"
+    nvim -c "lua require('claude-code-ide').setup({ debug = true })"
 
 # Install dependencies (for development)
 deps:

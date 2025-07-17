@@ -5,7 +5,7 @@ local spec = require("tests.spec.helpers.mcp_spec_dsl")
 
 spec.describe("MCP Server", function()
 	spec.server_info({
-		name = "claude-code.nvim",
+		name = "claude-code-ide.nvim",
 		version = "0.1.0",
 		protocol_version = "2025-06-18",
 	})
@@ -54,7 +54,7 @@ spec.describe("MCP Server", function()
 				resources = { listChanged = true },
 			},
 			serverInfo = {
-				name = "claude-code.nvim",
+				name = "claude-code-ide.nvim",
 				version = "0.1.0",
 			},
 			instructions = "Neovim MCP server for Claude integration",

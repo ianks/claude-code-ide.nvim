@@ -69,7 +69,7 @@ package.loaded["mini.icons"] = {
 _G.__TEST = true
 
 -- Load the plugin
-require("claude-code")
+require("claude-code-ide")
 
 -- Configure for testing
 vim.g.claude_code_debug = false -- Set to true for debugging

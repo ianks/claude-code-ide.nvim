@@ -1,6 +1,6 @@
-# claude-code.nvim Test Suite
+# claude-code-ide.nvim Test Suite
 
-This directory contains comprehensive tests for the claude-code.nvim MCP server implementation.
+This directory contains comprehensive tests for the claude-code-ide.nvim MCP server implementation.
 
 ## Running Tests
 

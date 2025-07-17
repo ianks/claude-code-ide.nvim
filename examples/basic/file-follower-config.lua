@@ -1,8 +1,8 @@
 -- Example configuration for using the Claude Code file follower
 -- This shows how to integrate automatic file following into your Neovim setup
 
--- Add this to your claude-code.nvim configuration
-require("claude-code").setup({
+-- Add this to your claude-code-ide.nvim configuration
+require("claude-code-ide").setup({
 	-- ... your existing configuration ...
 })
 

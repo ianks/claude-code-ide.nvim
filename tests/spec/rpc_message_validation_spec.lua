@@ -1,6 +1,6 @@
 -- Test for RPC message validation fix
-local rpc_init = require("claude-code.rpc.init")
-local protocol = require("claude-code.rpc.protocol")
+local rpc_init = require("claude-code-ide.rpc.init")
+local protocol = require("claude-code-ide.rpc.protocol")
 
 describe("RPC Message Validation", function()
 	it("should handle process_message without returning a value", function()

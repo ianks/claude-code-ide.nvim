@@ -1,6 +1,6 @@
 -- Tests for statusline integration
-local statusline = require("claude-code.statusline")
-local events = require("claude-code.events")
+local statusline = require("claude-code-ide.statusline")
+local events = require("claude-code-ide.events")
 
 describe("Statusline Integration", function()
 	before_each(function()
@@ -24,7 +24,7 @@ describe("Statusline Integration", function()
 
 		it("should show connected state when server is running", function()
 			-- Mock server state
-			local server = require("claude-code.server")
+			local server = require("claude-code-ide.server")
 			server._state = { running = true }
 			server.get_server = function()
 				return server._state

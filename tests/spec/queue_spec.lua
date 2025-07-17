@@ -1,7 +1,7 @@
 -- Tests for request queue and rate limiting
 
-local queue = require("claude-code.queue")
-local events = require("claude-code.events")
+local queue = require("claude-code-ide.queue")
+local events = require("claude-code-ide.events")
 
 describe("Request Queue", function()
 	local test_queue

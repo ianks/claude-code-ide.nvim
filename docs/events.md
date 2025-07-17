@@ -1,11 +1,11 @@
 # Event System
 
-claude-code.nvim provides a comprehensive event system that allows plugins and user configurations to react to various Claude-related events. The event system is built on top of Neovim's native User autocmds for maximum compatibility and performance.
+claude-code-ide.nvim provides a comprehensive event system that allows plugins and user configurations to react to various Claude-related events. The event system is built on top of Neovim's native User autocmds for maximum compatibility and performance.
 
 ## Quick Start
 
 ```lua
-local events = require("claude-code.events")
+local events = require("claude-code-ide.events")
 
 -- Listen to a specific event
 events.on("ToolExecuted", function(data)
@@ -144,7 +144,7 @@ events.debug(false)
 Show Claude tool execution history:
 
 ```lua
-local events = require("claude-code.events")
+local events = require("claude-code-ide.events")
 local tool_history = {}
 
 events.on("ToolExecuted", function(data)
@@ -181,7 +181,7 @@ end)
 Show Claude connection status:
 
 ```lua
-local events = require("claude-code.events")
+local events = require("claude-code-ide.events")
 local claude_status = "Disconnected"
 
 events.on("Connected", function() claude_status = "Connected" end)
@@ -208,7 +208,7 @@ require("lualine").setup({
 Show tool execution notifications:
 
 ```lua
-local events = require("claude-code.events")
+local events = require("claude-code-ide.events")
 
 events.on("ToolExecuted", function(data)
   require("notify")(
@@ -262,7 +262,7 @@ vim.api.nvim_create_autocmd("User", {
 Enable debug mode to see all events as they fire:
 
 ```lua
-require("claude-code.events").debug(true)
+require("claude-code-ide.events").debug(true)
 ```
 
 This will log all events to Neovim's message history with their data.

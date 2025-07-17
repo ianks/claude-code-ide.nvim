@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-claude-code.nvim is a Neovim plugin that integrates Claude AI directly into the Neovim text editor. The project is currently in the specification phase with detailed technical requirements documented.
+claude-code-ide.nvim is a Neovim plugin that integrates Claude AI directly into the Neovim text editor. The project is currently in the specification phase with detailed technical requirements documented.
 
 ## Architecture
 
@@ -18,15 +18,15 @@ The plugin implements a Model Context Protocol (MCP) server:
 
 ### Server Implementation
 
-- `lua/claude-code/server.lua` - MCP WebSocket server
-- `lua/claude-code/tools/` - MCP tool implementations
-- `lua/claude-code/discovery.lua` - Lock file management
+- `lua/claude-code-ide/server.lua` - MCP WebSocket server
+- `lua/claude-code-ide/tools/` - MCP tool implementations
+- `lua/claude-code-ide/discovery.lua` - Lock file management
 
 ### Client Interface
 
-- `lua/claude-code/init.lua` - Plugin entry point
-- `lua/claude-code/ui/` - UI components (windows, buffers)
-- `lua/claude-code/commands.lua` - Vim commands
+- `lua/claude-code-ide/init.lua` - Plugin entry point
+- `lua/claude-code-ide/ui/` - UI components (windows, buffers)
+- `lua/claude-code-ide/commands.lua` - Vim commands
 
 ## Development Commands
 
@@ -92,12 +92,12 @@ Test files go in `tests/spec/` and follow the pattern `*_spec.lua`. Tests use th
 The plugin should support configuration via:
 
 ```lua
-require('claude-code').setup({
+require('claude-code-ide').setup({
   port = 0,  -- 0 for random port (10000-65535)
   host = '127.0.0.1',
   debug = false,
   lock_file_dir = vim.fn.expand('~/.claude/ide'),
-  server_name = 'claude-code.nvim',
+  server_name = 'claude-code-ide.nvim',
   server_version = '0.1.0'
 })
 ```
@@ -178,7 +178,7 @@ The following plugins are already available in the user's Neovim configuration a
 
 **which-key.nvim** - Command palette
 
-- Register claude-code commands for discoverability
+- Register claude-code-ide commands for discoverability
 
 ### JSON Handling
 

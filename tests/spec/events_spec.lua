@@ -1,7 +1,7 @@
 -- Tests for the event system
 
 describe("Event System", function()
-	local events = require("claude-code.events")
+	local events = require("claude-code-ide.events")
 
 	-- Clean up any event handlers between tests
 	after_each(function()

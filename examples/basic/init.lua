@@ -1,4 +1,4 @@
--- Basic example configuration for claude-code.nvim
+-- Basic example configuration for claude-code-ide.nvim
 -- This config demonstrates a complete setup with UI and all dependencies
 
 -- Bootstrap lazy.nvim
@@ -93,23 +93,23 @@ require("lazy").setup({
 		end,
 	},
 
-	-- claude-code.nvim (local development)
+	-- claude-code-ide.nvim (local development)
 	{
 		dir = vim.fn.getcwd(), -- Load from current directory
-		name = "claude-code.nvim",
+		name = "claude-code-ide.nvim",
 		dependencies = {
 			"nvim-lua/plenary.nvim",
 			"folke/snacks.nvim",
 		},
 		config = function()
-			local claude = require("claude-code")
+			local claude = require("claude-code-ide")
 
 			-- Complete setup with all options
 			claude.setup({
 				-- Server configuration
 				port = 0, -- Random port
 				host = "127.0.0.1",
-				server_name = "claude-code.nvim-example",
+				server_name = "claude-code-ide.nvim-example",
 				server_version = "0.1.0",
 
 				-- Lock file location
@@ -174,11 +174,11 @@ require("lazy").setup({
 		init = function()
 			-- Add commands for starting/stopping server
 			vim.api.nvim_create_user_command("ClaudeCodeStart", function()
-				require("claude-code").start()
+				require("claude-code-ide").start()
 			end, { desc = "Start Claude Code server" })
 
 			vim.api.nvim_create_user_command("ClaudeCodeStop", function()
-				require("claude-code").stop()
+				require("claude-code-ide").stop()
 			end, { desc = "Stop Claude Code server" })
 		end,
 	},
@@ -224,7 +224,7 @@ require("lazy").setup({
 })
 
 -- Example event listeners with nice notifications
-local events = require("claude-code.events")
+local events = require("claude-code-ide.events")
 local Snacks = require("snacks")
 
 -- Connection events with snacks notifications
@@ -268,7 +268,7 @@ vim.o.statusline = table.concat({
 
 -- Start a new Claude CLI session in a terminal
 vim.api.nvim_create_user_command("ClaudeNew", function()
-	local server = require("claude-code.server").get_server()
+	local server = require("claude-code-ide.server").get_server()
 	if not server then
 		Snacks.notify.error("Server not running! Start it first with <leader>cs", { title = "Claude Code" })
 		return
@@ -323,7 +323,7 @@ end, { desc = "Start a new Claude CLI session in terminal" })
 local claude_terminal = nil
 
 vim.api.nvim_create_user_command("ClaudeToggleTerm", function()
-	local server = require("claude-code.server").get_server()
+	local server = require("claude-code-ide.server").get_server()
 	if not server then
 		Snacks.notify.error("Server not running! Start it first", { title = "Claude Code" })
 		return
@@ -378,7 +378,7 @@ end, { desc = "Toggle persistent Claude CLI terminal" })
 
 -- Helper commands
 vim.api.nvim_create_user_command("ClaudeInfo", function()
-	local server = require("claude-code.server").get_server()
+	local server = require("claude-code-ide.server").get_server()
 	if server then
 		local info = {
 			"Claude Code Server Information",
@@ -391,7 +391,7 @@ vim.api.nvim_create_user_command("ClaudeInfo", function()
 			string.format("Running: %s", server.running and "yes" or "no"),
 			string.format("Clients: %d", vim.tbl_count(server.clients)),
 			"",
-			"Tools executed: " .. require("claude-code.statusline").get_tool_count(),
+			"Tools executed: " .. require("claude-code-ide.statusline").get_tool_count(),
 		}
 
 		-- Create a floating window with the info
@@ -423,7 +423,7 @@ end, { desc = "Show detailed Claude Code server information" })
 
 -- Test command to verify events are working
 vim.api.nvim_create_user_command("ClaudeTest", function()
-	local tools = require("claude-code.tools")
+	local tools = require("claude-code-ide.tools")
 
 	-- Test openFile tool
 	local result = tools.execute("openFile", {
@@ -581,13 +581,13 @@ end, { desc = "Watch Claude Code events in real-time" })
 -- Autocommand to stop server on exit
 vim.api.nvim_create_autocmd("VimLeavePre", {
 	callback = function()
-		require("claude-code").stop()
+		require("claude-code-ide").stop()
 	end,
 })
 
 -- Test WebSocket connection
 vim.api.nvim_create_user_command("ClaudeTestConnection", function()
-	local server = require("claude-code.server").get_server()
+	local server = require("claude-code-ide.server").get_server()
 	if not server then
 		Snacks.notify.error("Server not running!", { title = "Claude Code" })
 		return

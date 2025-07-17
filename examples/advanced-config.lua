@@ -1,20 +1,20 @@
--- Advanced configuration example for claude-code.nvim
+-- Advanced configuration example for claude-code-ide.nvim
 -- This showcases all available configuration options
 
 return {
-	"ianks/claude-code.nvim",
+	"ianks/claude-code-ide.nvim",
 	dependencies = {
 		"nvim-lua/plenary.nvim",
 		"folke/snacks.nvim",
 	},
 	config = function()
-		require("claude-code").setup({
+		require("claude-code-ide").setup({
 			-- Server Configuration
 			server = {
 				host = "127.0.0.1",
 				port = 0, -- 0 = random port (recommended)
 				lock_file_dir = vim.fn.expand("~/.claude/ide"),
-				server_name = "claude-code.nvim",
+				server_name = "claude-code-ide.nvim",
 				server_version = "0.1.0",
 			},
 
@@ -176,7 +176,7 @@ return {
 			-- Logging Configuration
 			log = {
 				level = "INFO", -- Options: TRACE, DEBUG, INFO, WARN, ERROR
-				file = vim.fn.stdpath("data") .. "/claude-code.log",
+				file = vim.fn.stdpath("data") .. "/claude-code-ide.log",
 				max_size = 1048576, -- 1MB max log file size
 				format = "[%timestamp%] [%level%] %module%: %message%",
 			},
@@ -217,7 +217,7 @@ return {
 
 		-- Start the server automatically
 		vim.defer_fn(function()
-			require("claude-code").start()
+			require("claude-code-ide").start()
 		end, 100)
 	end,
 }

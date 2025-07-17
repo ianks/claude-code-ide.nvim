@@ -1,6 +1,6 @@
 -- Tests for configuration management
 
-local config = require("claude-code.config")
+local config = require("claude-code-ide.config")
 
 describe("Configuration System", function()
 	-- Save original config
@@ -191,7 +191,7 @@ describe("Configuration System", function()
 
 		it("should fall back to defaults on validation errors", function()
 			-- Mock notify to suppress error output
-			local notify = require("claude-code.ui.notify")
+			local notify = require("claude-code-ide.ui.notify")
 			local original_error = notify.error
 			local error_count = 0
 			notify.error = function()
@@ -329,7 +329,7 @@ describe("Configuration System", function()
 			}
 
 			-- Mock notify to suppress error
-			local notify = require("claude-code.ui.notify")
+			local notify = require("claude-code-ide.ui.notify")
 			local original_error = notify.error
 			notify.error = function() end
 

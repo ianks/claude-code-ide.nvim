@@ -1,6 +1,6 @@
 -- Tests for cache system
 
-local cache = require("claude-code.cache")
+local cache = require("claude-code-ide.cache")
 
 describe("Cache System", function()
 	local test_cache

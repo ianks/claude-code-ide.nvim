@@ -1,7 +1,7 @@
 -- Tests for WebSocket implementation
 
 describe("websocket", function()
-	local websocket = require("claude-code.server.websocket")
+	local websocket = require("claude-code-ide.server.websocket")
 
 	describe("parse_http_headers", function()
 		it("should parse valid WebSocket upgrade request", function()

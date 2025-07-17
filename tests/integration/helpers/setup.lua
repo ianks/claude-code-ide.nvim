@@ -40,7 +40,7 @@ function M.with_real_server(config, fn)
 	vim.fn.mkdir(config.lock_file_dir, "p")
 
 	-- Start the server
-	local server = require("claude-code.server").start(config)
+	local server = require("claude-code-ide.server").start(config)
 
 	-- Wait for server to be ready
 	vim.wait(100)

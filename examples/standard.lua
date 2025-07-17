@@ -1,20 +1,20 @@
--- Standard configuration for claude-code.nvim
+-- Standard configuration for claude-code-ide.nvim
 -- This is the recommended "green path" setup that works out of the box
 
 return {
-	"ianks/claude-code.nvim",
+	"ianks/claude-code-ide.nvim",
 	dependencies = {
 		"nvim-lua/plenary.nvim",
 		"folke/snacks.nvim", -- For the best UI experience
 	},
 	config = function()
 		-- Initialize with default settings
-		require("claude-code").setup()
+		require("claude-code-ide").setup()
 
 		-- That's it! The plugin is now ready to use.
 		--
 		-- Quick start:
-		-- 1. Run :lua require("claude-code").start() to start the server
+		-- 1. Run :lua require("claude-code-ide").start() to start the server
 		-- 2. In another terminal, run: claude --ide
 		-- 3. Press <leader>cc to open the Claude conversation window
 		--

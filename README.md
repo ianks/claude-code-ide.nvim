@@ -1,4 +1,4 @@
-# claude-code.nvim
+# claude-code-ide.nvim
 
 > **native** Claude AI integration for Neovim
 
@@ -8,7 +8,7 @@ ai can use your editor like you do.
 
 ## what
 
-claude-code.nvim integrates Claude Code's built-in IDE features directly into Neovim via MCP. Claude can see your code, run diagnostics, open files, and help you write software without context switching.
+claude-code-ide.nvim integrates Claude Code's built-in IDE features directly into Neovim via MCP. Claude can see your code, run diagnostics, open files, and help you write software without context switching.
 
 no browser tabs. just neovim.
 
@@ -26,7 +26,7 @@ no browser tabs. just neovim.
 ```lua
 -- lazy.nvim
 {
-  "ianks/claude-code.nvim",
+  "ianks/claude-code-ide.nvim",
   dependencies = { "nvim-lua/plenary.nvim" },
   config = true,
 }
@@ -36,7 +36,7 @@ no browser tabs. just neovim.
 
 ```bash
 # in neovim
-:lua require("claude-code").start()
+:lua require("claude-code-ide").start()
 
 # in terminal
 claude --ide
@@ -67,7 +67,7 @@ Claude can use these to interact with your editor:
 ## config
 
 ```lua
-require("claude-code").setup({
+require("claude-code-ide").setup({
   port = 0,  -- random port
   host = "127.0.0.1",
   debug = false,

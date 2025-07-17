@@ -1,7 +1,7 @@
 -- Tests for MCP resources RPC handlers
 
-local resources_handler = require("claude-code.rpc.handlers.resources")
-local resources = require("claude-code.resources")
+local resources_handler = require("claude-code-ide.rpc.handlers.resources")
+local resources = require("claude-code-ide.resources")
 
 describe("RPC Resources Handler", function()
 	local mock_rpc

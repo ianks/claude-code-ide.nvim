@@ -1,8 +1,8 @@
--- Tool execution tests for claude-code.nvim
+-- Tool execution tests for claude-code-ide.nvim
 -- Tests the actual execution of MCP tools
 
-local tools = require("claude-code.tools")
-local session = require("claude-code.session")
+local tools = require("claude-code-ide.tools")
+local session = require("claude-code-ide.session")
 local mock = require("luassert.mock")
 local stub = require("luassert.stub")
 

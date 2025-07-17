@@ -1,8 +1,8 @@
 -- Tests for terminal integration
 
-local terminal = require("claude-code.terminal")
-local config = require("claude-code.config")
-local events = require("claude-code.events")
+local terminal = require("claude-code-ide.terminal")
+local config = require("claude-code-ide.config")
+local events = require("claude-code-ide.events")
 
 describe("Terminal Integration", function()
 	local captured_events
@@ -121,7 +121,7 @@ describe("Terminal Integration", function()
 		terminal.close_all()
 
 		-- Reset terminal counter for consistent IDs
-		local Terminal = require("claude-code.terminal")
+		local Terminal = require("claude-code-ide.terminal")
 		Terminal._reset_counter = function()
 			-- This is a hack to reset the counter for testing
 			-- We'll need to add this method to the terminal module

@@ -1,7 +1,7 @@
 -- Tests for multi-pane layout system
 
-local layout = require("claude-code.ui.layout")
-local events = require("claude-code.events")
+local layout = require("claude-code-ide.ui.layout")
+local events = require("claude-code-ide.events")
 
 describe("UI Layout", function()
 	local captured_events = {}

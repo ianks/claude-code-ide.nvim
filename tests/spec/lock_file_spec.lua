@@ -2,7 +2,7 @@
 -- Tests the discovery mechanism via lock files
 
 describe("Lock File Management", function()
-	local discovery = require("claude-code.discovery")
+	local discovery = require("claude-code-ide.discovery")
 	local temp_dir
 
 	before_each(function()

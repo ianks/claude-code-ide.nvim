@@ -1,4 +1,4 @@
--- File follower example for claude-code.nvim
+-- File follower example for claude-code-ide.nvim
 -- Automatically follows files that Claude Code opens via the MCP server
 
 local M = {}
@@ -19,7 +19,7 @@ function M.setup(opts)
 	state.follow_delay = opts.follow_delay or state.follow_delay
 
 	-- Subscribe to FILE_OPENED events
-	local events = require("claude-code.events")
+	local events = require("claude-code-ide.events")
 	state.autocmd_id = events.on(events.events.FILE_OPENED, function(data)
 		if state.enabled and data and data.file_path then
 			M.follow_file(data)
@@ -168,7 +168,7 @@ end
 -- Cleanup function
 function M.cleanup()
 	if state.autocmd_id then
-		local events = require("claude-code.events")
+		local events = require("claude-code-ide.events")
 		events.off(state.autocmd_id)
 		state.autocmd_id = nil
 	end

@@ -59,7 +59,7 @@ describe("MCP Protocol Flow", function()
 			assert.is_table(response.result)
 			assert.equals("2025-06-18", response.result.protocolVersion)
 			assert.is_table(response.result.capabilities)
-			assert.equals("claude-code.nvim", response.result.serverInfo.name)
+			assert.equals("claude-code-ide.nvim", response.result.serverInfo.name)
 
 			-- Send initialized notification
 			client:notify("notifications/initialized", {})
