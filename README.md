@@ -1,27 +1,23 @@
 # claude-code-ide.nvim
 
-> **native** Claude AI integration for Neovim
+Native Claude Code integration for Neovim via the Model Context Protocol (MCP).
 
-🚧 **UNDER CONSTRUCTION** - This plugin is in active development. Breaking changes expected.
+> 🚧 **Under Active Development** - Core functionality is working. API may change.
 
-ai can use your editor like you do.
+## Overview
 
-## what
+claude-code-ide.nvim provides a WebSocket MCP server that runs inside Neovim, allowing Claude Code to interact with your editor as if it were a built-in IDE. Claude can open files, view diagnostics, create diffs, and help you write code without leaving your workflow.
 
-claude-code-ide.nvim integrates Claude Code's built-in IDE features directly into Neovim via MCP. Claude can see your code, run diagnostics, open files, and help you write software without context switching.
+## Features
 
-no browser tabs. just neovim.
+- **MCP WebSocket Server** - Runs directly in Neovim, no external processes
+- **IDE Tools** - Claude can open files, create diffs, view diagnostics, and more
+- **Auto-Discovery** - Claude Code automatically finds your Neovim instance via lock files
+- **Rich UI** - Integrated conversation window, progress indicators, and notifications
+- **Async Architecture** - Non-blocking operations using plenary.async
+- **Comprehensive Config** - Extensive customization options with sensible defaults
 
-## features
-
-- **websocket mcp server** - runs inside neovim, no external processes
-- **ide tools** - Claude can open files, create diffs, run diagnostics
-- **resource exposure** - share files, templates, workspace info
-- **smart caching** - reduces api calls, improves response time
-- **async everything** - non-blocking ui, background operations
-- **lock file discovery** - automatic connection via `~/.claude/ide/*.lock`
-
-## install
+## Installation
 
 ```lua
 -- lazy.nvim
@@ -32,70 +28,161 @@ no browser tabs. just neovim.
 }
 ```
 
-## quickstart
+For advanced setups, see [examples/](examples/):
+- [minimal.lua](examples/minimal.lua) - Bare minimum setup
+- [standard.lua](examples/standard.lua) - Recommended configuration
+- [advanced-config.lua](examples/advanced-config.lua) - All options explained
 
-```bash
-# in neovim
-:lua require("claude-code-ide").start()
+## Quick Start
 
-# in terminal
-claude --ide
-```
+1. Start the MCP server:
+   ```vim
+   :ClaudeCodeStart
+   ```
 
-that's it. Claude connects automatically.
+2. Connect from Claude Code:
+   ```bash
+   claude --ide
+   ```
 
-## keymaps
+The server creates a lock file at `~/.claude/nvim/servers.lock` for automatic discovery.
 
-| key | what |
-|-----|------|
-| `<leader>cc` | toggle chat |
-| `<leader>cs` | send selection |
-| `<leader>cd` | send diagnostics |
-| `<leader>cp` | command palette |
+## Commands
 
-## tools
+| Command | Description |
+|---------|-------------|
+| `:ClaudeCodeStart` | Start the MCP server |
+| `:ClaudeCodeStop` | Stop the MCP server |
+| `:ClaudeCodeRestart` | Restart the MCP server |
+| `:ClaudeCodeStatus` | Show server status |
+| `:ClaudeCodeToggle` | Toggle conversation window |
+| `:ClaudeCodeSend` | Send selection or current context |
+| `:ClaudeCodeLogs` | View debug logs |
+| `:ClaudeCodeClearLogs` | Clear debug logs |
 
-Claude can use these to interact with your editor:
+## Default Key Mappings
 
-- `openFile` - open files, jump to lines
-- `openDiff` - show code changes
-- `getDiagnostics` - get lsp errors
-- `getCurrentSelection` - read selected text
-- `getOpenEditors` - list open buffers
-- `getWorkspaceFolders` - get project info
+| Key | Action | Mode |
+|-----|--------|------|
+| `<leader>cc` | Toggle conversation | n |
+| `<leader>cs` | Send selection | n, v |
+| `<leader>cf` | Send current file | n |
+| `<leader>cd` | Send diagnostics | n |
+| `<leader>cD` | Open diff view | n |
+| `<leader>cn` | New conversation | n |
+| `<leader>cx` | Clear conversation | n |
+| `<leader>cr` | Retry last message | n |
+| `<leader>cp` | Show command palette | n |
+| `<leader>ct` | Toggle context | n |
+| `<leader>cv` | Toggle preview | n |
+| `<leader>cl` | Cycle layout | n |
 
-## config
+All mappings use `<leader>c` as prefix by default. Configure with `keymaps.prefix`.
+
+## MCP Tools Available to Claude
+
+- **`openFile`** - Open files and optionally select text ranges
+- **`openDiff`** - Create diff views showing code changes
+- **`close_tab`** - Close tabs after operations
+- **`getDiagnostics`** - Get LSP diagnostics for files or workspace
+- **`getCurrentSelection`** - Read selected text in visual mode
+- **`getOpenEditors`** - List all open buffers with metadata
+- **`getWorkspaceFolders`** - Get project root and workspace info
+- **`closeAllDiffTabs`** - Clean up all diff view tabs
+
+## Configuration
 
 ```lua
 require("claude-code-ide").setup({
-  port = 0,  -- random port
-  host = "127.0.0.1",
-  debug = false,
-  lock_file_dir = vim.fn.expand("~/.claude/ide"),
+  -- Server settings
+  server = {
+    host = "127.0.0.1",
+    port = 0,  -- 0 = random port
+    auto_start = false,  -- Start server on setup
+  },
+  
+  -- UI settings
+  ui = {
+    conversation = {
+      position = "right",  -- right, left, bottom, top, float
+      width = 80,
+      border = "rounded",
+    },
+  },
+  
+  -- Keymaps
+  keymaps = {
+    enabled = true,
+    prefix = "<leader>c",
+    -- See advanced-config.lua for all mappings
+  },
+  
+  -- Debug
+  debug = {
+    enabled = false,
+    log_level = "info",  -- debug, info, warn, error
+  },
 })
 ```
 
-## architecture
+See [examples/advanced-config.lua](examples/advanced-config.lua) for all options.
+
+## Architecture
 
 ```
-claude cli <--> websocket <--> neovim mcp server
-                                   |
-                                   +--> tools
-                                   +--> resources
-                                   +--> ui
+Claude Code CLI
+      |
+      v
+WebSocket (port from lock file)
+      |
+      v
+Neovim MCP Server
+      |
+      +---> Tools (file ops, diagnostics)
+      +---> Resources (workspace info)
+      +---> UI (windows, notifications)
+      +---> Events (file changes, etc)
 ```
 
-## dev
+The plugin uses:
+- **plenary.nvim** for async operations
+- **vim.uv** for WebSocket server
+- **vim.lsp** for diagnostics integration
+- Native Neovim APIs for all editor operations
+
+## Development
 
 ```bash
-just test        # run tests
-just test-file   # test specific file
+just test                    # Run all tests
+just test-verbose           # Run tests with verbose output
+just test-file <file>       # Test specific file
+just --list                 # Show all commands
 ```
 
-## philosophy
+Tests use Plenary's test framework. See [tests/README.md](tests/README.md) for details.
 
-ai should interact with editors the way developers do. no special apis. no complex abstractions. just tools that manipulate buffers and windows.
+## Requirements
 
-## license
+- Neovim 0.9.0+
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+- Claude Code CLI (for connecting)
 
-MIT
+## Troubleshooting
+
+1. **Server won't start**: Check `:ClaudeCodeStatus` and `:ClaudeCodeLogs`
+2. **Claude can't connect**: Verify lock file exists at `~/.claude/nvim/servers.lock`
+3. **WebSocket errors**: Ensure no firewall blocking localhost connections
+4. **Tool errors**: Enable debug mode and check logs
+
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more.
+
+## Contributing
+
+Contributions welcome! Please:
+1. Run tests with `just test`
+2. Follow existing code style
+3. Update tests for new features
+
+## License
+
+MIT - See [LICENSE](LICENSE) for details
