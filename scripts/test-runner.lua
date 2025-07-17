@@ -1,4 +1,4 @@
-#!/usr/bin/env lua
+#!/usr/bin/env luajit
 
 -- Test runner that runs tests individually to avoid hanging issues
 local test_files = {}

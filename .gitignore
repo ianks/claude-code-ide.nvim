@@ -6,6 +6,7 @@ PLUGIN_GUIDE.md
 
 # Lock files
 ~/.claude/ide/*.lock
+*.lock
 
 # Local test output
 test-output/
@@ -18,3 +19,26 @@ test-output/
 *~
 .idea/
 .vscode/
+*.sublime-*
+
+# OS files
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Neovim
+.netrwhist
+*.nvim.log
+
+# Lua
+luac.out
+
+# Project specific
+/claude-code.log
+/debug.log
+.claude/
+
+# Personal notes
+notes.md
+TODO.md
+scratch.*

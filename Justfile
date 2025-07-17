@@ -4,9 +4,13 @@
 default:
     @just --list
 
-# Run all tests
-test:
-    @./test-runner.lua
+# Run all tests (unit + integration)
+test: test-unit test-integration
+    @echo "All tests passed!"
+
+# Run unit tests only
+test-unit:
+    @./scripts/test-runner.lua
 
 # Run tests with output
 test-verbose:
@@ -42,14 +46,12 @@ fmt-check:
 
 # Run integration tests
 test-integration:
-    @./integration-test-runner.lua
+    @./scripts/integration-test-runner.lua
 
 # Run specific integration test file
 test-integration-file FILE:
     nvim --headless -u tests/integration_init.lua -c "lua require('plenary.busted').run('{{FILE}}')" -c "qa!"
 
-# Run all tests (unit + integration)
-test-all: test test-integration
 
 # Run all checks (tests, lint, format check, typecheck)
 check: test lint typecheck fmt-check
