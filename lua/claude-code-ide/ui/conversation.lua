@@ -10,6 +10,7 @@ M._state = {
 	window = nil,
 	buffer = nil,
 	client_id = nil,
+	messages = {}, -- Store conversation history
 }
 
 -- Create conversation buffer
@@ -169,6 +170,13 @@ function M.append(role, content)
 		return
 	end
 	
+	-- Store message in history
+	table.insert(M._state.messages, {
+		role = role,
+		content = content,
+		timestamp = os.time()
+	})
+	
 	-- Make buffer modifiable temporarily
 	vim.bo[M._state.buffer].modifiable = true
 	
@@ -214,6 +222,18 @@ function M.clear()
 		return
 	end
 	
+	-- Save current conversation before clearing
+	if #M._state.messages > 0 then
+		local persistence = require("claude-code-ide.persistence")
+		persistence.save_conversation(M._state.messages, {
+			session_id = M._state.client_id,
+			cleared = true
+		})
+	end
+	
+	-- Clear message history
+	M._state.messages = {}
+	
 	-- Recreate buffer with welcome message
 	local new_buf = create_buffer()
 	
@@ -231,66 +251,124 @@ end
 
 -- Save conversation to file
 function M.save()
-	if not M._state.buffer or not vim.api.nvim_buf_is_valid(M._state.buffer) then
+	if #M._state.messages == 0 then
 		notify.warn("No conversation to save")
 		return
 	end
 	
-	-- Get conversation content
-	local lines = vim.api.nvim_buf_get_lines(M._state.buffer, 0, -1, false)
+	local persistence = require("claude-code-ide.persistence")
+	local filename = persistence.save_conversation(M._state.messages, {
+		session_id = M._state.client_id,
+		manual_save = true
+	})
 	
-	-- Create filename with timestamp
-	local timestamp = os.date("%Y%m%d_%H%M%S")
-	local filename = string.format("claude_conversation_%s.md", timestamp)
-	
-	-- Use vim.ui.input to get save location
-	vim.ui.input({
-		prompt = "Save conversation as: ",
-		default = filename,
-	}, function(input)
-		if not input or input == "" then
-			return
-		end
-		
-		-- Write to file
-		local file = io.open(input, "w")
-		if file then
-			for _, line in ipairs(lines) do
-				file:write(line .. "\n")
-			end
-			file:close()
-			notify.success("Conversation saved to " .. input)
-			
-			-- Emit event
-			events.emit(events.events.CONVERSATION_SAVED, {
-				file = input,
-				client_id = M._state.client_id,
-			})
-		else
-			notify.error("Failed to save conversation")
-		end
-	end)
+	if filename then
+		notify.success("Conversation saved")
+	end
 end
 
 -- Setup auto-show on client connection
 function M.setup()
+	-- Set up persistence auto-save
+	local persistence = require("claude-code-ide.persistence")
+	persistence.setup_autosave(M)
+	
 	-- Show conversation window when Claude connects
 	events.on(events.events.CLIENT_CONNECTED, function(data)
 		vim.schedule(function()
 			M.show(data.client_id)
-			M.append("system", "Claude connected successfully!")
+			
+			-- Try to restore last session
+			local restored = persistence.restore_last_session()
+			if restored and restored.messages then
+				-- Restore message history
+				M._state.messages = restored.messages
+				
+				-- Rebuild buffer with restored messages
+				M._rebuild_buffer_from_history()
+				
+				notify.celebrate("Welcome back! Previous conversation restored.")
+				M.append("system", "Claude connected! Previous conversation restored.")
+			else
+				M.append("system", "Claude connected successfully!")
+				-- Celebrate first connection
+				if not M._has_connected_before then
+					M._has_connected_before = true
+					notify.celebrate("Welcome to Claude Code! Ready to assist you.")
+				end
+			end
 		end)
 	end)
 	
-	-- Hide conversation window when Claude disconnects
+	-- Save conversation when Claude disconnects
 	events.on(events.events.CLIENT_DISCONNECTED, function(data)
 		vim.schedule(function()
 			if M._state.client_id == data.client_id then
 				M.append("system", "Claude disconnected.")
-				-- Don't auto-hide, let user close manually
+				
+				-- Save conversation
+				if #M._state.messages > 0 then
+					local persistence = require("claude-code-ide.persistence")
+					persistence.save_conversation(M._state.messages, {
+						session_id = M._state.client_id,
+						disconnected = true
+					})
+				end
 			end
 		end)
 	end)
+end
+
+-- Rebuild buffer from message history
+function M._rebuild_buffer_from_history()
+	if not M._state.buffer or not vim.api.nvim_buf_is_valid(M._state.buffer) then
+		return
+	end
+	
+	-- Clear buffer and add header
+	vim.bo[M._state.buffer].modifiable = true
+	local lines = {
+		"# Claude Code - Restored Conversation",
+		"",
+		"---",
+		"",
+	}
+	vim.api.nvim_buf_set_lines(M._state.buffer, 0, -1, false, lines)
+	
+	-- Add each message
+	for _, msg in ipairs(M._state.messages) do
+		local msg_lines = {}
+		local timestamp = os.date("%H:%M:%S", msg.timestamp)
+		
+		if msg.role == "user" then
+			table.insert(msg_lines, string.format("**[%s] You:**", timestamp))
+		elseif msg.role == "assistant" then
+			table.insert(msg_lines, string.format("**[%s] Claude:**", timestamp))
+		else
+			table.insert(msg_lines, string.format("**[%s] System:**", timestamp))
+		end
+		
+		table.insert(msg_lines, "")
+		
+		-- Split content into lines
+		for line in msg.content:gmatch("[^\r\n]+") do
+			table.insert(msg_lines, line)
+		end
+		
+		table.insert(msg_lines, "")
+		table.insert(msg_lines, "---")
+		table.insert(msg_lines, "")
+		
+		vim.api.nvim_buf_set_lines(M._state.buffer, -1, -1, false, msg_lines)
+	end
+	
+	vim.bo[M._state.buffer].modifiable = false
+end
+
+-- Load conversation from persistence
+function M.load_conversation()
+	local persistence = require("claude-code-ide.persistence")
+	persistence.show_picker()
 end
 
 return M

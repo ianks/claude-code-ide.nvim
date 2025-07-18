@@ -4,7 +4,8 @@ local notify = require("claude-code-ide.ui.notify")
 
 -- Refresh conversation
 function M.refresh()
-	-- Placeholder for refresh functionality
+	local conversation = require("claude-code-ide.ui.conversation")
+	conversation._rebuild_buffer_from_history()
 	notify.info("Conversation refreshed")
 end
 
@@ -37,6 +38,12 @@ end
 function M.copy_message()
 	-- TODO: Implement message copying based on cursor position
 	notify.info("Message copy not yet implemented")
+end
+
+-- Load saved conversation
+function M.load_conversation()
+	local conversation = require("claude-code-ide.ui.conversation")
+	conversation.load_conversation()
 end
 
 return M

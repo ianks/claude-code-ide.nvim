@@ -175,4 +175,28 @@ function M.success(msg, opts)
 	return M.notify(msg, "info", opts)
 end
 
+-- Celebration notification for positive outcomes
+function M.celebrate(msg, opts)
+	opts = opts or {}
+	
+	-- Random celebration emojis
+	local celebrations = {"🎉", "🎊", "✨", "🌟", "🎈", "🎆", "🥳", "🙌"}
+	local emoji = celebrations[math.random(#celebrations)]
+	
+	opts.icon = emoji
+	opts.timeout = opts.timeout or 5000
+	
+	-- Add animation if using Snacks
+	local ok, Snacks = pcall(require, "snacks")
+	if ok and Snacks.notify then
+		-- Add sparkle animation
+		local frames = {"✨", "🌟", "⭐", "✨", "💫"}
+		opts.opts = function(notif)
+			notif.icon = frames[math.floor(vim.uv.hrtime() / (1e6 * 200)) % #frames + 1]
+		end
+	end
+	
+	return M.notify(msg, "info", opts)
+end
+
 return M

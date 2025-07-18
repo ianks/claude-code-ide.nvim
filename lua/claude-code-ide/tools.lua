@@ -94,6 +94,17 @@ register_tool("openFile", "Open a file in the editor and optionally select text"
 		} or nil,
 	})
 
+	-- Celebrate if opening a test file that passes
+	if file_path:match("_spec%.lua$") or file_path:match("_test%.lua$") then
+		vim.defer_fn(function()
+			-- Check if file has no errors
+			local diagnostics = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR })
+			if #diagnostics == 0 then
+				notify.celebrate("All tests passing! Great job!")
+			end
+		end, 500)
+	end
+
 	return {
 		content = {
 			{
@@ -157,7 +168,9 @@ register_tool("openDiff", "Open a diff view", {
 				session.data.pending_diffs[args.tab_name] = nil
 			end
 
-			notify.success("Changes accepted for " .. vim.fn.fnamemodify(args.old_file_path, ":t"))
+			-- Celebrate successful changes
+			local filename = vim.fn.fnamemodify(args.old_file_path, ":t")
+			notify.celebrate("Changes accepted for " .. filename .. "!")
 
 			-- Close the diff window
 			if diff_window and diff_window.close then

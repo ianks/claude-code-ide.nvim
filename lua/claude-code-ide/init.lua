@@ -108,11 +108,19 @@ function M.setup(opts)
 	-- Setup conversation UI
 	local conversation = require("claude-code-ide.ui.conversation")
 	conversation.setup()
+	
+	-- Setup celebration events
+	M._setup_celebrations()
 
 	M._state.initialized = true
 
+	-- Check if setup wizard should run
+	local wizard = require("claude-code-ide.setup_wizard")
+	local wizard_shown = wizard.check_and_run()
+	
 	-- Auto-start server if enabled (default: true for zero-friction experience)
-	if M._state.config.auto_start ~= false then
+	-- Don't auto-start if wizard is being shown
+	if not wizard_shown and M._state.config.auto_start ~= false then
 		vim.defer_fn(function()
 			M.start()
 			notify.info("Claude Code server started automatically")
@@ -169,6 +177,43 @@ function M.status()
 		server_running = server and server.running or false,
 		config = M._state.config,
 	}
+end
+
+-- Setup celebration events
+function M._setup_celebrations()
+	local events = require("claude-code-ide.events")
+	local notify = require("claude-code-ide.ui.notify")
+	
+	-- Celebrate when tests pass
+	events.on(events.events.TESTS_PASSED, function(data)
+		notify.celebrate("All tests passed! Excellent work!")
+	end)
+	
+	-- Celebrate when build succeeds
+	events.on(events.events.BUILD_SUCCEEDED, function(data)
+		notify.celebrate("Build successful! Ready to ship!")
+	end)
+	
+	-- Celebrate when errors are fixed
+	events.on(events.events.ERROR_FIXED, function(data)
+		local messages = {
+			"Error fixed! You're on fire!",
+			"Nice debugging! Error resolved!",
+			"Problem solved! Great job!",
+			"Bug squashed! Keep it up!",
+		}
+		notify.celebrate(messages[math.random(#messages)])
+	end)
+	
+	-- Celebrate milestones
+	local tool_count = 0
+	events.on(events.events.TOOL_EXECUTED, function(data)
+		tool_count = tool_count + 1
+		-- Celebrate every 10 successful tool executions
+		if tool_count % 10 == 0 then
+			notify.celebrate(string.format("Milestone: %d tools executed successfully!", tool_count))
+		end
+	end)
 end
 
 return M
