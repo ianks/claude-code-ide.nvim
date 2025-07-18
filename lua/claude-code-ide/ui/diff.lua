@@ -1,5 +1,5 @@
 -- Diff preview UI for claude-code-ide.nvim
--- Shows unified diff in a single preview card
+-- Shows unified diff in a non-blocking preview split
 
 local M = {}
 
@@ -96,17 +96,19 @@ function M.show(opts)
 		end
 	end
 
-	-- Create a single diff preview window
+	-- Create a non-blocking preview split instead of modal window
 	local diff_win = Snacks.win({
 		buf = diff_buf,
-		position = "float",
-		width = 0.8,
-		height = 0.7,
-		border = "rounded",
-		title = string.format(" 🔍 Diff Preview: %s ", vim.fn.fnamemodify(opts.old_file_path, ":t")),
+		position = "right",
+		width = 0.5,
+		height = 1.0,
+		border = "single",
+		title = string.format(" Diff Preview: %s ", vim.fn.fnamemodify(opts.old_file_path, ":t")),
 		title_pos = "center",
-		footer = " 💾 <Enter> Accept & Save | ❌ <Esc>/q Reject | 🔍 <Tab> Toggle view ",
+		footer = " <Enter> Accept | <Esc>/q Reject | <Tab> Toggle view ",
 		footer_pos = "center",
+		focusable = true,
+		zindex = 10, -- Lower z-index to not block other windows
 		keys = {
 			["<Enter>"] = function()
 				accept_changes()
@@ -119,6 +121,19 @@ function M.show(opts)
 			q = function()
 				reject_changes()
 				return "close"
+			end,
+			-- Allow normal navigation to switch focus
+			["<C-w>h"] = function()
+				vim.cmd("wincmd h")
+			end,
+			["<C-w>l"] = function()
+				vim.cmd("wincmd l")
+			end,
+			["<C-w>j"] = function()
+				vim.cmd("wincmd j")
+			end,
+			["<C-w>k"] = function()
+				vim.cmd("wincmd k")
 			end,
 			["<Tab>"] = function()
 				-- Toggle between unified diff and side-by-side view
@@ -160,7 +175,8 @@ function M.show(opts)
 			end,
 		},
 		on_close = function()
-			reject_changes() -- Only calls if decision_made is false
+			-- Don't auto-reject on close if user is just switching windows
+			-- Only reject if explicitly closed with q or Esc
 			vim.schedule(function()
 				if vim.api.nvim_buf_is_valid(diff_buf) then
 					vim.api.nvim_buf_delete(diff_buf, { force = true })

@@ -17,7 +17,7 @@ vim.api.nvim_create_user_command("ClaudeCode", function(opts)
 	local claude = require("claude-code-ide")
 
 	if opts.args == "start" then
-		claude.setup()
+		claude.start()
 	elseif opts.args == "stop" then
 		claude.stop()
 	elseif opts.args == "status" then
@@ -36,14 +36,57 @@ end, {
 	desc = "Control Claude Code server",
 })
 
--- Auto-start if configured
-vim.api.nvim_create_autocmd("VimEnter", {
-	callback = function()
-		if vim.g.claude_code_auto_start then
-			vim.defer_fn(function()
-				require("claude-code-ide").setup()
-			end, 100)
-		end
-	end,
-	desc = "Auto-start Claude Code server",
+-- Create ClaudeCodeConnect command to launch Claude CLI
+vim.api.nvim_create_user_command("ClaudeCodeConnect", function(opts)
+	local claude = require("claude-code-ide")
+	local status = claude.status()
+	local notify = require("claude-code-ide.ui.notify")
+	
+	if not status.initialized or not status.server_running then
+		notify.warn("Claude Code server is not running. Starting server...")
+		claude.start()
+		vim.defer_fn(function()
+			-- Give server time to start and create lock file
+			local job = require("plenary.job")
+			job:new({
+				command = "claude",
+				args = { "code" },
+				on_exit = function(j, return_val)
+					if return_val ~= 0 then
+						notify.error_with_action(
+							"Failed to launch Claude CLI. Make sure 'claude' command is installed.",
+							"<leader>ci",
+							"install Claude CLI",
+							function()
+								vim.ui.open("https://github.com/anthropics/claude-cli#installation")
+							end
+						)
+					end
+				end,
+			}):start()
+		end, 500)
+	else
+		-- Server already running, just launch Claude CLI
+		local job = require("plenary.job")
+		job:new({
+			command = "claude",
+			args = { "code" },
+			on_exit = function(j, return_val)
+				if return_val ~= 0 then
+					notify.error_with_action(
+						"Failed to launch Claude CLI. Make sure 'claude' command is installed.",
+						"<leader>ci",
+						"install Claude CLI",
+						function()
+							vim.ui.open("https://github.com/anthropics/claude-cli#installation")
+						end
+					)
+				end
+			end,
+		}):start()
+	end
+end, {
+	desc = "Launch Claude CLI and connect to Neovim",
 })
+
+-- Note: auto-start is now handled in setup() function based on config.auto_start

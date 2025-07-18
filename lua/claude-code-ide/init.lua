@@ -29,6 +29,8 @@ function M.setup(opts)
 		server_version = "0.1.0",
 		keymaps = {}, -- Default keymaps enabled
 		autocmds = {}, -- Default autocmds enabled
+		auto_start = true, -- Auto-start server on setup
+		statusline = true, -- Enable statusline component by default
 	}, opts or {})
 
 	-- Set up logging
@@ -46,8 +48,20 @@ function M.setup(opts)
 
 	-- Setup keymaps unless disabled
 	if M._state.config.keymaps ~= false then
-		local keymaps = require("claude-code-ide.keymaps")
-		keymaps.setup(M._state.config.keymaps)
+		-- Try the full keymaps module first, fall back to simple if it fails
+		local ok, keymaps = pcall(require, "claude-code-ide.keymaps")
+		if ok and keymaps.setup then
+			local keymap_config = type(M._state.config.keymaps) == "table" and M._state.config.keymaps or {
+				enabled = true,
+				prefix = "<leader>c",
+				mappings = {},
+			}
+			keymaps.setup(keymap_config)
+		else
+			-- Fall back to simple keymaps
+			local simple_keymaps = require("claude-code-ide.keymaps_simple")
+			simple_keymaps.setup(M._state.config.keymaps)
+		end
 	end
 
 	-- Setup autocommands unless disabled
@@ -64,11 +78,46 @@ function M.setup(opts)
 	local cache = require("claude-code-ide.cache")
 	cache.setup()
 
-	-- Setup statusline integration
-	local statusline = require("claude-code-ide.statusline")
-	statusline.setup()
+	-- Setup statusline integration (enabled by default)
+	if M._state.config.statusline ~= false then
+		local statusline = require("claude-code-ide.statusline")
+		statusline.setup()
+		
+		-- Add to global statusline if possible
+		vim.schedule(function()
+			-- Check if user has a custom statusline
+			local has_custom_statusline = vim.o.statusline ~= ""
+			
+			if not has_custom_statusline then
+				-- Add Claude status to default statusline
+				vim.o.statusline = vim.o.statusline .. "%=%{v:lua.require('claude-code-ide.statusline').get_status()}"
+			else
+				-- Notify user how to add it to their custom statusline
+				notify.info_with_action(
+					"Claude Code statusline is ready. Add to your statusline with: %{v:lua.require('claude-code-ide.statusline').get_status()}",
+					"<leader>cs",
+					"view statusline docs",
+					function()
+						vim.cmd("help claude-code-statusline")
+					end
+				)
+			end
+		end)
+	end
+	
+	-- Setup conversation UI
+	local conversation = require("claude-code-ide.ui.conversation")
+	conversation.setup()
 
 	M._state.initialized = true
+
+	-- Auto-start server if enabled (default: true for zero-friction experience)
+	if M._state.config.auto_start ~= false then
+		vim.defer_fn(function()
+			M.start()
+			notify.info("Claude Code server started automatically")
+		end, 100)
+	end
 end
 
 -- Start the server

@@ -118,17 +118,51 @@ function M.history()
 	end
 end
 
+-- Helper function to create actionable notification with keybinding hints
+local function notify_with_action(msg, level, action_key, action_desc, action_fn)
+	local full_msg = msg .. "\n\nPress " .. action_key .. " to " .. action_desc
+	
+	-- Register temporary keymap
+	vim.keymap.set("n", action_key, function()
+		-- Remove the keymap after use
+		vim.keymap.del("n", action_key)
+		action_fn()
+	end, { desc = "Claude Code: " .. action_desc, silent = true })
+	
+	-- Show notification with timeout to auto-remove keymap
+	local id = M.notify(full_msg, level, { timeout = 10000 })
+	
+	-- Auto-remove keymap after timeout
+	vim.defer_fn(function()
+		pcall(vim.keymap.del, "n", action_key)
+	end, 10000)
+	
+	return id
+end
+
 -- Convenience methods
 function M.error(msg, opts)
 	return M.notify(msg, "error", opts)
+end
+
+function M.error_with_action(msg, action_key, action_desc, action_fn)
+	return notify_with_action(msg, "error", action_key, action_desc, action_fn)
 end
 
 function M.warn(msg, opts)
 	return M.notify(msg, "warn", opts)
 end
 
+function M.warn_with_action(msg, action_key, action_desc, action_fn)
+	return notify_with_action(msg, "warn", action_key, action_desc, action_fn)
+end
+
 function M.info(msg, opts)
 	return M.notify(msg, "info", opts)
+end
+
+function M.info_with_action(msg, action_key, action_desc, action_fn)
+	return notify_with_action(msg, "info", action_key, action_desc, action_fn)
 end
 
 function M.debug(msg, opts)
