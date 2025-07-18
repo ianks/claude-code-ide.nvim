@@ -128,7 +128,10 @@ register_tool("openDiff", "Open a diff view", {
 	end
 	
 	local diff_ui = require("claude-code-ide.ui.diff")
-	local notify = require("claude-code-ide.ui.notify")
+	-- Simple notify
+	local function notify(msg, level)
+		vim.notify(msg, level or vim.log.levels.INFO)
+	end
 	local async = require("plenary.async")
 
 	-- Store session data
@@ -157,7 +160,7 @@ register_tool("openDiff", "Open a diff view", {
 				session.data.pending_diffs[args.tab_name] = nil
 			end
 
-			notify.success("Changes accepted for " .. vim.fn.fnamemodify(args.old_file_path, ":t"))
+			notify("Changes accepted for " .. vim.fn.fnamemodify(args.old_file_path, ":t"))
 
 			-- Close the diff window
 			if diff_window and diff_window.close then
@@ -186,7 +189,7 @@ register_tool("openDiff", "Open a diff view", {
 				session.data.pending_diffs[args.tab_name] = nil
 			end
 
-			notify.info("Changes rejected")
+			notify("Changes rejected")
 
 			-- Close the diff window
 			if diff_window and diff_window.close then
