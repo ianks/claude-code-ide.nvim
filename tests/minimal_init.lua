@@ -1,6 +1,9 @@
 -- Minimal init.lua for running tests
 -- Usage: nvim --headless -u tests/minimal_init.lua -c "PlenaryBustedDirectory tests/spec/ {minimal_init = 'tests/minimal_init.lua'}"
 
+-- Set test mode flag
+vim.g.claude_code_test_mode = true
+
 -- Set up package path
 local plenary_path = vim.fn.stdpath("data") .. "/lazy/plenary.nvim"
 local plugin_path = vim.fn.getcwd()

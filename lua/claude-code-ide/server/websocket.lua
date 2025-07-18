@@ -344,7 +344,9 @@ function M._handle_frame(connection)
 
 		-- If not FIN, we should accumulate frames (not implemented for simplicity)
 		if not fin then
-			notify.warn("Fragmented frames not supported")
+			vim.schedule(function()
+				notify.warn("Fragmented frames not supported")
+			end)
 		end
 	end
 end
@@ -412,7 +414,9 @@ function M._close_connection(connection, reason)
 	end
 
 	if reason then
-		notify.debug("WebSocket connection closed: " .. reason)
+		vim.schedule(function()
+			notify.debug("WebSocket connection closed: " .. reason)
+		end)
 	end
 end
 

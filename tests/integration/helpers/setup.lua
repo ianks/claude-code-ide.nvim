@@ -38,6 +38,9 @@ function M.with_real_server(config, fn)
 
 	-- Create lock file directory
 	vim.fn.mkdir(config.lock_file_dir, "p")
+	
+	-- Set the discovery module to use our test lock directory
+	require("claude-code-ide.discovery")._set_lock_dir(config.lock_file_dir)
 
 	-- Start the server
 	local server = require("claude-code-ide.server").start(config)
@@ -149,6 +152,14 @@ function M.assert_successful_response(response)
 	assert.is_nil(response.error, "Expected no error but got: " .. vim.inspect(response.error))
 	assert.truthy(response.result, "Expected result in response")
 	return response.result
+end
+
+-- Helper to write a file
+function M.write_file(path, content)
+	local file = io.open(path, "w")
+	assert.truthy(file, "Failed to open file for writing: " .. path)
+	file:write(content)
+	file:close()
 end
 
 -- Create diagnostics for testing

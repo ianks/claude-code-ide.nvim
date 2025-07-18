@@ -24,7 +24,7 @@ local function register_tool(name, description, input_schema, handler)
 end
 
 -- openFile tool
-register_tool("openFile", "Open a file in the editor", {
+register_tool("openFile", "Open a file in the editor and optionally select text", {
 	type = "object",
 	properties = {
 		filePath = { type = "string" },
@@ -115,6 +115,18 @@ register_tool("openDiff", "Open a diff view", {
 	},
 	required = { "old_file_path", "new_file_path", "new_file_contents", "tab_name" },
 }, function(args, session)
+	-- In test mode, return immediately without UI
+	if vim.g.claude_code_test_mode then
+		return {
+			content = {
+				{
+					type = "text",
+					text = "Diff shown for " .. vim.fn.fnamemodify(args.old_file_path, ":t"),
+				},
+			},
+		}
+	end
+	
 	local diff_ui = require("claude-code-ide.ui.diff")
 	local notify = require("claude-code-ide.ui.notify")
 	local async = require("plenary.async")
