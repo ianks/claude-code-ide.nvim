@@ -121,12 +121,6 @@ M.events = {
 	PROGRESS_STARTED = "ProgressStarted",
 	PROGRESS_UPDATED = "ProgressUpdated",
 	PROGRESS_COMPLETED = "ProgressCompleted",
-	
-	-- Success events
-	FILE_WRITTEN = "FileWritten",
-	TESTS_PASSED = "TestsPassed",
-	BUILD_SUCCEEDED = "BuildSucceeded",
-	ERROR_FIXED = "ErrorFixed",
 
 	-- UI events
 	UI_CONVERSATION_OPENED = "UIConversationOpened",

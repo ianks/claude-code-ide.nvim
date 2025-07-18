@@ -287,15 +287,9 @@ function M.setup()
 				-- Rebuild buffer with restored messages
 				M._rebuild_buffer_from_history()
 				
-				notify.celebrate("Welcome back! Previous conversation restored.")
 				M.append("system", "Claude connected! Previous conversation restored.")
 			else
 				M.append("system", "Claude connected successfully!")
-				-- Celebrate first connection
-				if not M._has_connected_before then
-					M._has_connected_before = true
-					notify.celebrate("Welcome to Claude Code! Ready to assist you.")
-				end
 			end
 		end)
 	end)
