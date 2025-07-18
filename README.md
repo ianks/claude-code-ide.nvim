@@ -10,12 +10,12 @@ claude-code-ide.nvim provides a WebSocket MCP server that runs inside Neovim, al
 
 ## Features
 
-- **MCP WebSocket Server** - Runs directly in Neovim, no external processes
+- **Zero-friction setup** - Server auto-starts by default
 - **IDE Tools** - Claude can open files, create diffs, view diagnostics, and more
-- **Auto-Discovery** - Claude Code automatically finds your Neovim instance via lock files
-- **Rich UI** - Integrated conversation window, progress indicators, and notifications
-- **Async Architecture** - Non-blocking operations using plenary.async
-- **Comprehensive Config** - Extensive customization options with sensible defaults
+- **Smart text objects** - Send functions, classes, or selections to Claude naturally
+- **Non-blocking UI** - Diff previews and conversations don't interrupt your flow
+- **Session persistence** - Conversations auto-save and restore
+- **Rich notifications** - Actionable error messages with recovery hints
 
 ## Installation
 
@@ -24,164 +24,217 @@ claude-code-ide.nvim provides a WebSocket MCP server that runs inside Neovim, al
 {
   "ianks/claude-code-ide.nvim",
   dependencies = { "nvim-lua/plenary.nvim" },
-  config = true,
+  config = function()
+    require("claude-code-ide").setup()
+  end,
 }
 ```
 
-For advanced setups, see [examples/](examples/):
-- [minimal.lua](examples/minimal.lua) - Bare minimum setup
-- [standard.lua](examples/standard.lua) - Recommended configuration
-- [advanced-config.lua](examples/advanced-config.lua) - All options explained
-
 ## Quick Start
 
-1. Start the MCP server:
-   ```vim
-   :ClaudeCodeStart
+1. **Connect Claude** (server starts automatically):
+   ```lua
+   vim.cmd("ClaudeCodeConnect")
+   -- or press <leader>co
    ```
 
-2. Connect from Claude Code:
-   ```bash
-   claude --ide
-   ```
+That's it! The server auto-starts and Claude will connect to your Neovim instance.
 
-The server creates a lock file at `~/.claude/nvim/servers.lock` for automatic discovery.
+## Configuration Examples
 
-## Commands
+### Minimal (Recommended)
 
-| Command | Description |
-|---------|-------------|
-| `:ClaudeCodeStart` | Start the MCP server |
-| `:ClaudeCodeStop` | Stop the MCP server |
-| `:ClaudeCodeRestart` | Restart the MCP server |
-| `:ClaudeCodeStatus` | Show server status |
-| `:ClaudeCodeToggle` | Toggle conversation window |
-| `:ClaudeCodeSend` | Send selection or current context |
-| `:ClaudeCodeLogs` | View debug logs |
-| `:ClaudeCodeClearLogs` | Clear debug logs |
+```lua
+require("claude-code-ide").setup()
+-- That's it! Sensible defaults handle everything
+```
 
-## Default Key Mappings
+### Custom Keymaps
 
-| Key | Action | Mode |
-|-----|--------|------|
-| `<leader>cc` | Toggle conversation | n |
-| `<leader>cs` | Send selection | n, v |
-| `<leader>cf` | Send current file | n |
-| `<leader>cd` | Send diagnostics | n |
-| `<leader>cD` | Open diff view | n |
-| `<leader>cn` | New conversation | n |
-| `<leader>cx` | Clear conversation | n |
-| `<leader>cr` | Retry last message | n |
-| `<leader>cp` | Show command palette | n |
-| `<leader>ct` | Toggle context | n |
-| `<leader>cv` | Toggle preview | n |
-| `<leader>cl` | Cycle layout | n |
+```lua
+require("claude-code-ide").setup({
+  keymaps = {
+    prefix = "<leader>ai", -- Change prefix from default <leader>c
+  }
+})
+```
 
-All mappings use `<leader>c` as prefix by default. Configure with `keymaps.prefix`.
+### Disable Features
 
-## MCP Tools Available to Claude
+```lua
+require("claude-code-ide").setup({
+  auto_start = false,      -- Don't auto-start server
+  statusline = false,      -- Disable statusline integration
+  keymaps = false,         -- Disable all keymaps
+})
+```
 
-- **`openFile`** - Open files and optionally select text ranges
-- **`openDiff`** - Create diff views showing code changes
-- **`close_tab`** - Close tabs after operations
-- **`getDiagnostics`** - Get LSP diagnostics for files or workspace
-- **`getCurrentSelection`** - Read selected text in visual mode
-- **`getOpenEditors`** - List all open buffers with metadata
-- **`getWorkspaceFolders`** - Get project root and workspace info
-- **`closeAllDiffTabs`** - Clean up all diff view tabs
-
-## Configuration
+### Advanced UI Configuration
 
 ```lua
 require("claude-code-ide").setup({
   -- Server settings
-  server = {
-    host = "127.0.0.1",
-    port = 0,  -- 0 = random port
-    auto_start = false,  -- Start server on setup
-  },
+  port = 0,                -- 0 = random available port
+  host = "127.0.0.1",
   
-  -- UI settings
-  ui = {
-    conversation = {
-      position = "right",  -- right, left, bottom, top, float
-      width = 80,
-      border = "rounded",
-    },
-  },
+  -- Features
+  auto_start = true,       -- Start server automatically
+  statusline = true,       -- Show connection status in statusline
   
-  -- Keymaps
+  -- Keymaps (set to false to disable)
   keymaps = {
-    enabled = true,
     prefix = "<leader>c",
-    -- See advanced-config.lua for all mappings
   },
   
-  -- Debug
-  debug = {
-    enabled = false,
-    log_level = "info",  -- debug, info, warn, error
+  -- Debug settings
+  debug = false,           -- Enable debug logging
+})
+```
+
+## Default Key Mappings
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `<leader>co` | `:ClaudeCodeConnect` | Launch Claude and connect |
+| `<leader>cc` | Send selection/line | Send code to Claude |
+| `<leader>cf` | Send function | Send current function |
+| `<leader>cC` | Send class | Send current class |
+| `<leader>cp` | Send paragraph | Send current paragraph |
+| `<leader>cb` | Send buffer | Send entire file |
+| `<leader>cs` | Start server | Start MCP server |
+| `<leader>cS` | Stop server | Stop MCP server |
+| `<leader>c?` | Show status | Show connection status |
+
+### In Conversation Window
+
+| Key | Action |
+|-----|--------|
+| `q` | Close window |
+| `c` | Clear conversation |
+| `s` | Save conversation |
+| `r` | Refresh view |
+| `?` | Show help |
+| `y` | Copy message |
+| `<CR>` | Send current line |
+
+## Commands
+
+```lua
+-- Server control
+vim.cmd("ClaudeCode start")     -- Start server
+vim.cmd("ClaudeCode stop")      -- Stop server
+vim.cmd("ClaudeCode status")    -- Show status
+
+-- Quick connect
+vim.cmd("ClaudeCodeConnect")    -- Launch Claude CLI and connect
+```
+
+## Statusline Integration
+
+Add Claude's connection status to your statusline:
+
+```lua
+-- For custom statuslines, add this component:
+"%{v:lua.require('claude-code-ide.statusline').get_status()}"
+
+-- Example with lualine:
+require('lualine').setup({
+  sections = {
+    lualine_x = {
+      function()
+        return require('claude-code-ide.statusline').get_status()
+      end,
+    },
   },
 })
 ```
 
-See [examples/advanced-config.lua](examples/advanced-config.lua) for all options.
+## Text Objects
+
+The plugin provides smart text object detection:
+
+```lua
+-- Send the function under cursor
+vim.keymap.set("n", "<leader>cf", function()
+  require("claude-code-ide.text_objects").send_function()
+end)
+
+-- Send the class under cursor
+vim.keymap.set("n", "<leader>cC", function()
+  require("claude-code-ide.text_objects").send_class()
+end)
+
+-- Works with any language that has treesitter support
+```
+
+## Session Persistence
+
+Conversations are automatically saved and restored:
+
+```lua
+-- Conversations save to: ~/.local/share/nvim/claude-code-ide/conversations/
+-- Auto-saves on: disconnect, every 60s, after tool execution
+-- Auto-restores on reconnect
+
+-- Load a previous conversation
+require("claude-code-ide.persistence").show_picker()
+```
+
+## MCP Tools Available
+
+Claude can use these tools to help you:
+
+- **`openFile`** - Open files and select specific text ranges
+- **`openDiff`** - Show changes in a non-blocking split
+- **`getDiagnostics`** - Get LSP errors and warnings
+- **`getCurrentSelection`** - Read your selected text
+- **`getOpenEditors`** - See all open buffers
+- **`getWorkspaceFolders`** - Get project structure
 
 ## Architecture
 
 ```
-Claude Code CLI
-      |
-      v
-WebSocket (port from lock file)
-      |
-      v
-Neovim MCP Server
-      |
-      +---> Tools (file ops, diagnostics)
-      +---> Resources (workspace info)
-      +---> UI (windows, notifications)
-      +---> Events (file changes, etc)
+Claude CLI
+    ↓
+WebSocket connection
+    ↓
+Neovim MCP Server (this plugin)
+    ├── Tools (file operations)
+    ├── UI (conversation window)
+    ├── Events (file changes)
+    └── Persistence (auto-save)
 ```
-
-The plugin uses:
-- **plenary.nvim** for async operations
-- **vim.uv** for WebSocket server
-- **vim.lsp** for diagnostics integration
-- Native Neovim APIs for all editor operations
-
-## Development
-
-```bash
-just test                    # Run all tests
-just test-verbose           # Run tests with verbose output
-just test-file <file>       # Test specific file
-just --list                 # Show all commands
-```
-
-Tests use Plenary's test framework. See [tests/README.md](tests/README.md) for details.
-
-## Requirements
-
-- Neovim 0.9.0+
-- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
-- Claude Code CLI (for connecting)
 
 ## Troubleshooting
 
-1. **Server won't start**: Check `:ClaudeCodeStatus` and `:ClaudeCodeLogs`
-2. **Claude can't connect**: Verify lock file exists at `~/.claude/nvim/servers.lock`
-3. **WebSocket errors**: Ensure no firewall blocking localhost connections
-4. **Tool errors**: Enable debug mode and check logs
+### Server Issues
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more.
+```lua
+-- Check server status
+vim.cmd("ClaudeCode status")
 
-## Contributing
+-- View debug logs (if debug = true)
+vim.cmd("messages")
+```
 
-Contributions welcome! Please:
-1. Run tests with `just test`
-2. Follow existing code style
-3. Update tests for new features
+### Connection Issues
+
+1. **Claude CLI not found**: Install from [github.com/anthropics/claude-cli](https://github.com/anthropics/claude-cli)
+2. **Lock file issues**: Check `~/.claude/ide/` for lock files
+3. **Port conflicts**: Set a specific port in config
+
+### Recovery Actions
+
+The plugin provides actionable error messages:
+- If Claude CLI fails: Press `<leader>ci` to open installation page
+- If server crashes: Auto-restart with `:ClaudeCodeConnect`
+
+## Requirements
+
+- Neovim 0.8.0+
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+- Claude CLI (`claude` command)
+- (Optional) Treesitter for smart text objects
 
 ## License
 

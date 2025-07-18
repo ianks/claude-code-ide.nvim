@@ -111,13 +111,8 @@ function M.setup(opts)
 
 	M._state.initialized = true
 
-	-- Check if setup wizard should run
-	local wizard = require("claude-code-ide.setup_wizard")
-	local wizard_shown = wizard.check_and_run()
-	
 	-- Auto-start server if enabled (default: true for zero-friction experience)
-	-- Don't auto-start if wizard is being shown
-	if not wizard_shown and M._state.config.auto_start ~= false then
+	if M._state.config.auto_start ~= false then
 		vim.defer_fn(function()
 			M.start()
 			notify.info("Claude Code server started automatically")

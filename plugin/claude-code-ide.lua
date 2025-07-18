@@ -36,14 +36,6 @@ end, {
 	desc = "Control Claude Code server",
 })
 
--- Create setup wizard command
-vim.api.nvim_create_user_command("ClaudeCodeSetup", function()
-	local wizard = require("claude-code-ide.setup_wizard")
-	wizard.run()
-end, {
-	desc = "Run Claude Code setup wizard",
-})
-
 -- Create ClaudeCodeConnect command to launch Claude CLI
 vim.api.nvim_create_user_command("ClaudeCodeConnect", function(opts)
 	local claude = require("claude-code-ide")

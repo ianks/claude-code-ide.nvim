@@ -27,8 +27,8 @@ function M.setup(config)
 	-- Create which-key group if available
 	local ok, which_key = pcall(require, "which-key")
 	if ok then
-		which_key.register({
-			[prefix] = { name = "+claude" },
+		which_key.add({
+			{ prefix, group = "claude" },
 		})
 	end
 
