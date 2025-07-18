@@ -27,7 +27,7 @@ function M.toggle()
 	
 	-- Create or show terminal
 	if not M._state.terminal then
-		M._state.terminal = Snacks.terminal("claude code", {
+		M._state.terminal = Snacks.terminal("claude --ide", {
 			win = {
 				position = "right",
 				width = 0.4,
