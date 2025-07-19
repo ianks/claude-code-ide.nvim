@@ -26,8 +26,8 @@ That's it.
 ## What it does
 
 1. Starts an MCP server in Neovim
-2. Opens a terminal with `claude code` on the right
-3. Claude connects to your Neovim automatically
+1. Opens a terminal with `claude code` on the right
+1. Claude connects to your Neovim automatically
 
 ## Configuration
 

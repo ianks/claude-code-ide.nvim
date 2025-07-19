@@ -126,7 +126,7 @@ register_tool("openDiff", "Open a diff view", {
 			},
 		}
 	end
-	
+
 	local diff_ui = require("claude-code-ide.ui.diff")
 	-- Simple notify
 	local function notify(msg, level)

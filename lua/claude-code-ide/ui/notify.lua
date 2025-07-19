@@ -121,22 +121,22 @@ end
 -- Helper function to create actionable notification with keybinding hints
 local function notify_with_action(msg, level, action_key, action_desc, action_fn)
 	local full_msg = msg .. "\n\nPress " .. action_key .. " to " .. action_desc
-	
+
 	-- Register temporary keymap
 	vim.keymap.set("n", action_key, function()
 		-- Remove the keymap after use
 		vim.keymap.del("n", action_key)
 		action_fn()
 	end, { desc = "Claude Code: " .. action_desc, silent = true })
-	
+
 	-- Show notification with timeout to auto-remove keymap
 	local id = M.notify(full_msg, level, { timeout = 10000 })
-	
+
 	-- Auto-remove keymap after timeout
 	vim.defer_fn(function()
 		pcall(vim.keymap.del, "n", action_key)
 	end, 10000)
-	
+
 	return id
 end
 

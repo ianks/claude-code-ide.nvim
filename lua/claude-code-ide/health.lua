@@ -69,11 +69,11 @@ function M.check()
 
 	local config = require("claude-code-ide.config")
 	local lock_dir = vim.fn.expand(config.options.lock_file_dir)
-	
+
 	-- Check lock file directory
 	if vim.fn.isdirectory(lock_dir) == 1 then
 		ok("Lock file directory exists: " .. lock_dir)
-		
+
 		-- Check permissions
 		local stat = vim.loop.fs_stat(lock_dir)
 		if stat and stat.mode then
@@ -92,7 +92,7 @@ function M.check()
 		local status = server.get_status()
 		ok(string.format("MCP server running on port %d", status.port))
 		info(string.format("Lock file: %s", status.lock_file))
-		
+
 		-- Check if Claude is connected
 		local client_count = status.client_count or 0
 		if client_count > 0 then
@@ -128,7 +128,10 @@ function M.check()
 	if vim.fn.filereadable(log_file) == 1 then
 		local size = vim.fn.getfsize(log_file)
 		if size > 10 * 1024 * 1024 then -- 10MB
-			warn(string.format("Log file is large: %.1f MB", size / 1024 / 1024), "Consider clearing with :ClaudeCodeCacheClear")
+			warn(
+				string.format("Log file is large: %.1f MB", size / 1024 / 1024),
+				"Consider clearing with :ClaudeCodeCacheClear"
+			)
 		else
 			info(string.format("Log file: %s (%.1f KB)", log_file, size / 1024))
 		end

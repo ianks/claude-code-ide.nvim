@@ -38,7 +38,7 @@ function M.with_real_server(config, fn)
 
 	-- Create lock file directory
 	vim.fn.mkdir(config.lock_file_dir, "p")
-	
+
 	-- Set the discovery module to use our test lock directory
 	require("claude-code-ide.discovery")._set_lock_dir(config.lock_file_dir)
 

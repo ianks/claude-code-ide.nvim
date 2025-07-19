@@ -16,15 +16,15 @@ function M.toggle()
 		vim.notify("Run :lua require('claude-code-ide').setup() first", vim.log.levels.WARN)
 		return
 	end
-	
+
 	local Snacks = require("snacks")
-	
+
 	-- If terminal exists and is visible, hide it
 	if M._state.terminal and M._state.terminal.win and M._state.terminal.win:valid() then
 		M._state.terminal:hide()
 		return
 	end
-	
+
 	-- Create or show terminal
 	if not M._state.terminal then
 		M._state.terminal = Snacks.terminal("claude --ide", {
@@ -41,7 +41,7 @@ end
 -- Setup
 function M.setup(opts)
 	opts = opts or {}
-	
+
 	-- Start MCP server
 	local server = require("claude-code-ide.server")
 	M._state.server = server.start({
@@ -51,13 +51,13 @@ function M.setup(opts)
 		server_name = "claude-code-ide.nvim",
 		server_version = "0.1.0",
 	})
-	
+
 	-- Setup keymap
 	vim.keymap.set("n", "<leader>ct", M.toggle, {
 		desc = "Toggle Claude terminal",
 		silent = true,
 	})
-	
+
 	M._state.initialized = true
 end
 

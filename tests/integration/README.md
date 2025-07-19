@@ -7,9 +7,9 @@ This directory contains integration tests for claude-code-ide.nvim that test rea
 Unlike unit tests that mock heavily, these integration tests:
 
 1. **Use real WebSocket connections** - No mocked TCP sockets or handshakes
-2. **Start actual servers** - Real server lifecycle with lock files
-3. **Perform real vim operations** - Actual buffer/window manipulation
-4. **Test end-to-end workflows** - Complete user scenarios
+1. **Start actual servers** - Real server lifecycle with lock files
+1. **Perform real vim operations** - Actual buffer/window manipulation
+1. **Test end-to-end workflows** - Complete user scenarios
 
 ## Test Structure
 
@@ -41,6 +41,7 @@ just test-all
 ### WebSocket Client
 
 The `websocket_client.lua` implements a real WebSocket client using vim.loop (libuv):
+
 - Performs actual TCP connections
 - Implements WebSocket handshake (RFC 6455)
 - Handles frame parsing and masking
@@ -49,6 +50,7 @@ The `websocket_client.lua` implements a real WebSocket client using vim.loop (li
 ### Test Helpers
 
 The `setup.lua` provides utilities for:
+
 - Temporary workspace creation
 - Real server lifecycle management
 - Client creation with auth
@@ -57,20 +59,23 @@ The `setup.lua` provides utilities for:
 ### Test Scenarios
 
 1. **Server Integration**
+
    - Server startup and shutdown
    - Lock file creation/cleanup
    - Authentication validation
    - Concurrent connections
    - Error handling
 
-2. **Tools Integration**
+1. **Tools Integration**
+
    - File operations (openFile)
    - Diagnostics retrieval
    - Selection handling
    - Buffer management
    - Diff creation
 
-3. **Session Integration**
+1. **Session Integration**
+
    - State persistence
    - Multi-step workflows
    - Resource subscriptions
@@ -79,9 +84,9 @@ The `setup.lua` provides utilities for:
 ## Benefits
 
 1. **Higher Confidence** - Tests actual component interactions
-2. **Catch Integration Bugs** - Find issues mocks might hide
-3. **Better Documentation** - Shows real usage patterns
-4. **Regression Prevention** - Ensures protocol compatibility
+1. **Catch Integration Bugs** - Find issues mocks might hide
+1. **Better Documentation** - Shows real usage patterns
+1. **Regression Prevention** - Ensures protocol compatibility
 
 ## Writing New Integration Tests
 
@@ -124,11 +129,13 @@ end)
 ## Debugging
 
 Set debug mode in tests:
+
 ```lua
 client:set_debug(true)  -- Prints all WebSocket messages
 ```
 
 Or enable server debug:
+
 ```lua
 helpers.with_real_server({ debug = true }, function(server, config)
   -- Server will log all operations
@@ -138,14 +145,14 @@ end)
 ## Known Limitations
 
 1. **Speed** - Integration tests are slower than unit tests
-2. **Environment** - Requires Neovim with plenary.nvim
-3. **Async Timing** - Some operations need wait times
-4. **Session Isolation** - Vim state is shared between tests
+1. **Environment** - Requires Neovim with plenary.nvim
+1. **Async Timing** - Some operations need wait times
+1. **Session Isolation** - Vim state is shared between tests
 
 ## Future Improvements
 
 1. Parallel test execution
-2. Better session isolation
-3. Performance benchmarking
-4. Coverage reporting
-5. CI/CD optimizations
+1. Better session isolation
+1. Performance benchmarking
+1. Coverage reporting
+1. CI/CD optimizations
