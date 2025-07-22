@@ -90,16 +90,45 @@ function M.open(opts)
 	return term
 end
 
--- Execute code in terminal
+-- Execute code in terminal (actually executes Lua code)
 function M.execute_code(code, opts)
 	opts = opts or {}
-	local term = M.open(opts)
 
-	if term and code then
-		term:send(code .. "\n")
+	-- Execute Lua code and capture the result
+	local success, result = pcall(function()
+		-- Load and execute the code
+		local chunk, load_err = loadstring(code)
+		if not chunk then
+			return "Syntax error: " .. tostring(load_err)
+		end
+
+		-- Execute and capture result
+		local exec_result = chunk()
+
+		-- Convert result to string
+		if exec_result == nil then
+			return "nil"
+		elseif type(exec_result) == "string" then
+			return exec_result
+		elseif type(exec_result) == "number" or type(exec_result) == "boolean" then
+			return tostring(exec_result)
+		else
+			-- Use vim.inspect for tables and other complex types
+			return vim.inspect(exec_result)
+		end
+	end)
+
+	if success then
+		return {
+			output = result,
+			success = true,
+		}
+	else
+		return {
+			output = "Error: " .. tostring(result),
+			success = false,
+		}
 	end
-
-	return term
 end
 
 -- Execute file in terminal

@@ -542,11 +542,11 @@ local function register_execute_code_tool()
 
 	register_tool(
 		"executeCode",
-		"Execute python code in the Jupyter kernel for the current notebook file.\n    \n    All code will be executed in the current Jupyter kernel.\n    \n    Avoid declaring variables or modifying the state of the kernel unless the user\n    explicitly asks for it.\n    \n    Any code executed will persist across calls to this tool, unless the kernel\n    has been restarted.",
+		"Execute Lua code in the current Neovim instance.\n\nThe code will be evaluated in Neovim's Lua environment with full access to vim.* APIs.\n\nResults will be returned as strings. Tables and other complex types will be converted using vim.inspect().\n\nAvoid modifying the editor state unless explicitly requested by the user.",
 		create_schema({
 			code = {
 				type = "string",
-				description = "The code to be executed on the kernel.",
+				description = "The Lua code to be executed in Neovim.",
 			},
 		}, { "code" }),
 		function(args)
@@ -563,11 +563,14 @@ local function register_execute_code_tool()
 			end
 
 			local result = terminal.execute_code(code)
+			-- Ensure text is always a string
+			local output_text = tostring(result.output or "Code executed")
+
 			return {
 				content = {
 					{
 						type = "text",
-						text = result.output or "Code executed",
+						text = output_text,
 					},
 				},
 			}

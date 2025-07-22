@@ -297,6 +297,12 @@ function M.setup(opts)
 			resources.setup()
 		end
 
+		-- Setup editor notifications
+		local notifications = load_dependency("claude-code-ide.editor_notifications", false)
+		if notifications and notifications.setup then
+			notifications.setup()
+		end
+
 		-- Auto-start server if configured
 		if State.config.server.auto_start then
 			M.start_server()

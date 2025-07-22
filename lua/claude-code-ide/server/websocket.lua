@@ -151,6 +151,13 @@ function M._handle_handshake(connection)
 			client_id = client_id,
 			auth_token_preview = auth.AUTH_TOKEN and auth.AUTH_TOKEN:sub(1, 8) .. "...",
 		})
+
+		-- Send initial notifications to Claude
+		vim.defer_fn(function()
+			local notifications = require("claude-code-ide.editor_notifications")
+			notifications.notify_ide_connected()
+			notifications.notify_selection_changed()
+		end, 100)
 	end)
 end
 

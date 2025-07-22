@@ -294,6 +294,16 @@ function M.call_tool(rpc, params)
 		}
 	end
 
+	-- Debug log the result structure
+	log.debug("Tools", "Tool result structure", {
+		tool = tool_name,
+		has_content = result.content ~= nil,
+		content_type = result.content and type(result.content),
+		first_item = result.content and result.content[1],
+		text_type = result.content and result.content[1] and type(result.content[1].text),
+		text_value = result.content and result.content[1] and tostring(result.content[1].text),
+	})
+
 	-- Ensure result has the correct MCP structure
 	if not result.content then
 		-- Wrap plain responses in MCP format
