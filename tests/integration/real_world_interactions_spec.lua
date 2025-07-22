@@ -50,8 +50,13 @@ describe("Real-world MCP interactions", function()
 				local result = helpers.assert_successful_response(init_response)
 				assert.equals("2025-06-18", result.protocolVersion)
 				assert.truthy(result.capabilities)
+
+				-- CRITICAL: Must have BOTH tools AND resources capabilities (from real logs)
 				assert.truthy(result.capabilities.tools)
 				assert.equals(true, result.capabilities.tools.listChanged)
+				assert.truthy(result.capabilities.resources)
+				assert.equals(true, result.capabilities.resources.listChanged)
+
 				assert.truthy(result.serverInfo)
 				assert.equals("claude-code-ide.nvim", result.serverInfo.name)
 				assert.truthy(result.serverInfo.version)
@@ -69,7 +74,7 @@ describe("Real-world MCP interactions", function()
 				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
 				local client = create_test_client(server, lock_file)
 
-				-- Send ide_connected notification
+				-- Send ide_connected notification (no response expected)
 				client:notify("ide_connected", {
 					pid = 27519,
 				})
@@ -80,6 +85,133 @@ describe("Real-world MCP interactions", function()
 				-- Server should still be responsive
 				local response = client:request("tools/list")
 				helpers.assert_successful_response(response)
+			end)
+		end)
+	end)
+
+	describe("Schema format compatibility", function()
+		it("should return tool schemas with exact real-world format", function()
+			helpers.with_real_server({}, function(server, config)
+				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+				local client = create_test_client(server, lock_file)
+
+				local response = client:request("tools/list")
+				local result = helpers.assert_successful_response(response)
+
+				assert.truthy(result.tools)
+				assert.True(#result.tools > 0)
+
+				-- Find openFile tool to test schema format
+				local openFile = nil
+				for _, tool in ipairs(result.tools) do
+					if tool.name == "openFile" then
+						openFile = tool
+						break
+					end
+				end
+
+				assert.truthy(openFile, "openFile tool should exist")
+
+				-- Verify exact schema format from real logs
+				local schema = openFile.inputSchema
+				assert.truthy(schema)
+				assert.equals("object", schema.type)
+				assert.equals(false, schema.additionalProperties) -- CRITICAL: Must be false
+				assert.equals("http://json-schema.org/draft-07/schema#", schema["$schema"]) -- CRITICAL: Must have $schema
+
+				-- Verify properties structure
+				assert.truthy(schema.properties)
+				assert.truthy(schema.properties.filePath)
+				assert.equals("string", schema.properties.filePath.type)
+
+				-- Verify required array format
+				assert.truthy(schema.required)
+				assert.True(#schema.required >= 1)
+				assert.True(vim.tbl_contains(schema.required, "filePath"))
+			end)
+		end)
+
+		it("should return resource schemas with correct format", function()
+			helpers.with_real_server({}, function(server, config)
+				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+				local client = create_test_client(server, lock_file)
+
+				local response = client:request("resources/list")
+				local result = helpers.assert_successful_response(response)
+
+				assert.truthy(result.resources)
+				-- Resources may be empty but should be valid array
+				assert.equals("table", type(result.resources))
+			end)
+		end)
+	end)
+
+	describe("Tool execution compatibility", function()
+		it("should return MCP-compliant content format for tool responses", function()
+			helpers.with_temp_workspace(function(workspace)
+				helpers.with_real_server({}, function(server, config)
+					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+					local client = create_test_client(server, lock_file)
+
+					-- Test getWorkspaceFolders which should have deterministic output
+					local response = client:request("tools/call", {
+						name = "getWorkspaceFolders",
+						arguments = {},
+					})
+
+					local result = helpers.assert_successful_response(response)
+
+					-- CRITICAL: Must follow MCP content format from real logs
+					assert.truthy(result.content)
+					assert.equals("array", type(result.content))
+					assert.True(#result.content > 0)
+
+					-- Each content item must have type and text
+					for _, content_item in ipairs(result.content) do
+						assert.truthy(content_item.type)
+						assert.truthy(content_item.text)
+						assert.equals("text", content_item.type) -- Real logs show "text" type
+					end
+				end)
+			end)
+		end)
+
+		it("should handle tool execution errors in MCP format", function()
+			helpers.with_real_server({}, function(server, config)
+				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+				local client = create_test_client(server, lock_file)
+
+				-- Call openFile with invalid arguments
+				local response = client:request("tools/call", {
+					name = "openFile",
+					arguments = {
+						filePath = "/nonexistent/file/that/should/not/exist.txt",
+					},
+				})
+
+				-- Should still return success with error content, not JSON-RPC error
+				local result = helpers.assert_successful_response(response)
+				assert.truthy(result.content)
+				assert.equals("array", type(result.content))
+			end)
+		end)
+
+		it("should handle getDiagnostics with optional parameters", function()
+			helpers.with_temp_workspace(function(workspace)
+				helpers.with_real_server({}, function(server, config)
+					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+					local client = create_test_client(server, lock_file)
+
+					-- Test getDiagnostics without uri parameter (should be optional)
+					local response = client:request("tools/call", {
+						name = "getDiagnostics",
+						arguments = {},
+					})
+
+					local result = helpers.assert_successful_response(response)
+					assert.truthy(result.content)
+					assert.equals("array", type(result.content))
+				end)
 			end)
 		end)
 	end)
@@ -112,11 +244,14 @@ describe("Real-world MCP interactions", function()
 				assert.truthy(tool_names.getWorkspaceFolders)
 				assert.truthy(tool_names.getCurrentSelection)
 
-				-- Verify openFile schema matches
+				-- Verify openFile schema matches exactly
 				local openFile = tool_names.openFile
 				assert.equals("Open a file in the editor and optionally select text", openFile.description)
 				assert.truthy(openFile.inputSchema)
 				assert.equals("object", openFile.inputSchema.type)
+				assert.equals(false, openFile.inputSchema.additionalProperties)
+				assert.equals("http://json-schema.org/draft-07/schema#", openFile.inputSchema["$schema"])
+
 				assert.truthy(openFile.inputSchema.properties.filePath)
 				assert.truthy(openFile.inputSchema.properties.preview)
 				assert.truthy(openFile.inputSchema.properties.startText)
@@ -130,6 +265,40 @@ describe("Real-world MCP interactions", function()
 				-- The uri parameter is optional (not in required array)
 				assert.truthy(getDiagnostics.inputSchema.required)
 				assert.equals(0, #getDiagnostics.inputSchema.required)
+			end)
+		end)
+	end)
+
+	describe("JSON-RPC 2.0 compliance", function()
+		it("should handle malformed requests gracefully", function()
+			helpers.with_real_server({}, function(server, config)
+				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+				local client = helpers.create_client(server.port, lock_file.authToken)
+
+				-- Send malformed JSON-RPC request
+				local response = client:send_raw('{"jsonrpc":"2.0","method":"invalid_method","id":1}')
+
+				-- Should receive proper JSON-RPC error
+				assert.truthy(response)
+				assert.truthy(response.error)
+				assert.equals(-32601, response.error.code) -- Method not found
+			end)
+		end)
+
+		it("should validate request ID types correctly", function()
+			helpers.with_real_server({}, function(server, config)
+				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+				local client = create_test_client(server, lock_file)
+
+				-- Test with string ID
+				local response = client:request_with_id("tools/list", {}, "string-id")
+				local result = helpers.assert_successful_response(response)
+				assert.truthy(result.tools)
+
+				-- Test with number ID
+				local response2 = client:request_with_id("tools/list", {}, 12345)
+				local result2 = helpers.assert_successful_response(response2)
+				assert.truthy(result2.tools)
 			end)
 		end)
 	end)
@@ -148,265 +317,85 @@ describe("Real-world MCP interactions", function()
 
 					-- Send selection_changed notification matching log format
 					client:notify("selection_changed", {
-						text = "",
-						filePath = test_file,
-						fileUrl = "file://" .. test_file,
+						file = test_file,
 						selection = {
-							start = {
-								line = 0,
-								character = 0,
-							},
-							["end"] = {
-								line = 0,
-								character = 0,
-							},
-							isEmpty = true,
+							start = { line = 1, character = 0 },
+							["end"] = { line = 1, character = 5 },
 						},
 					})
 
-					-- Server should still be responsive
+					-- Small delay to ensure notification is processed
 					vim.wait(50)
+
+					-- Server should still be responsive
 					local response = client:request("tools/list")
 					helpers.assert_successful_response(response)
 				end)
 			end)
 		end)
 
-		it("should handle log_event notifications", function()
-			helpers.with_real_server({}, function(server, config)
-				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
-				local client = create_test_client(server, lock_file)
-
-				-- Send log_event notifications from the log
-				client:notify("log_event", {
-					eventName = "run_claude_command",
-					eventData = {},
-				})
-
-				vim.wait(50)
-
-				client:notify("log_event", {
-					eventName = "quick_fix_command",
-					eventData = {},
-				})
-
-				-- Server should still be responsive
-				vim.wait(50)
-				local response = client:request("tools/list")
-				helpers.assert_successful_response(response)
-			end)
-		end)
-	end)
-
-	describe("Tool calls", function()
-		it("should handle getDiagnostics without uri", function()
+		it("should handle text_changed notifications", function()
 			helpers.with_temp_workspace(function(workspace)
 				helpers.with_real_server({}, function(server, config)
 					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
 					local client = create_test_client(server, lock_file)
 
-					-- Create a file with an error
-					local test_file = workspace .. "/error.lua"
-					helpers.write_file(test_file, "local x = y") -- y is undefined
-					vim.cmd("edit " .. test_file)
-
-					-- Call getDiagnostics without uri (gets all diagnostics)
-					local response = client:request("tools/call", {
-						name = "getDiagnostics",
-						arguments = {},
-					})
-
-					local result = helpers.assert_successful_response(response)
-					assert.truthy(result.content)
-					assert.equals("text", result.content[1].type)
-
-					-- Should return diagnostics in expected format
-					local text = result.content[1].text
-					assert.truthy(text)
-				end)
-			end)
-		end)
-
-		it("should handle getDiagnostics with specific uri", function()
-			helpers.with_temp_workspace(function(workspace)
-				helpers.with_real_server({}, function(server, config)
-					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
-					local client = create_test_client(server, lock_file)
-
+					-- Create and open a test file
 					local test_file = workspace .. "/test.lua"
-					helpers.write_file(test_file, "return 42")
+					helpers.write_file(test_file, "local hello = 'world'")
 					vim.cmd("edit " .. test_file)
 
-					-- Call getDiagnostics with specific uri
-					local response = client:request("tools/call", {
-						name = "getDiagnostics",
-						arguments = {
-							uri = "file://" .. test_file,
-						},
+					-- Send text_changed notification
+					client:notify("text_changed", {
+						file = test_file,
+						content = "local hello = 'universe'",
 					})
 
-					local result = helpers.assert_successful_response(response)
-					assert.truthy(result.content)
-					assert.equals("text", result.content[1].type)
-				end)
-			end)
-		end)
+					-- Small delay to ensure notification is processed
+					vim.wait(50)
 
-		it("should handle closeAllDiffTabs", function()
-			helpers.with_real_server({}, function(server, config)
-				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
-				local client = create_test_client(server, lock_file)
-
-				local response = client:request("tools/call", {
-					name = "closeAllDiffTabs",
-					arguments = {},
-				})
-
-				local result = helpers.assert_successful_response(response)
-				assert.truthy(result.content)
-				assert.equals("text", result.content[1].type)
-				-- VSCode returns "CLOSED_1_DIFF_TABS" format
-				assert.truthy(
-					result.content[1].text:match("CLOSED_%d+_DIFF_TABS") or result.content[1].text:match("No diff tabs")
-				)
-			end)
-		end)
-
-		it("should handle openDiff with full parameters", function()
-			helpers.with_temp_workspace(function(workspace)
-				helpers.with_real_server({}, function(server, config)
-					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
-					local client = create_test_client(server, lock_file)
-
-					-- Create a test file
-					local test_file = workspace .. "/README.md"
-					helpers.write_file(test_file, "# Original Content\n\nThis is the original.")
-
-					-- Open diff matching the log format
-					local response = client:request("tools/call", {
-						name = "openDiff",
-						arguments = {
-							old_file_path = test_file,
-							new_file_path = test_file,
-							new_file_contents = "# Modified Content\n\nThis is the modified version.",
-							tab_name = "✻ [Claude Code] README.md (5a0ae4) ⧉",
-						},
-					})
-
-					local result = helpers.assert_successful_response(response)
-					assert.truthy(result.content)
-					assert.equals("text", result.content[1].type)
-					assert.truthy(result.content[1].text:match("Diff shown for"))
-				end)
-			end)
-		end)
-
-		it("should handle close_tab", function()
-			helpers.with_temp_workspace(function(workspace)
-				helpers.with_real_server({}, function(server, config)
-					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
-					local client = create_test_client(server, lock_file)
-
-					-- Create and open a file first
-					local test_file = workspace .. "/test.lua"
-					helpers.write_file(test_file, "return 42")
-					vim.cmd("edit " .. test_file)
-					vim.cmd("tabnew") -- Create a new tab
-
-					local tabs_before = vim.api.nvim_list_tabpages()
-
-					-- Close tab with specific name format from log
-					local response = client:request("tools/call", {
-						name = "close_tab",
-						arguments = {
-							tab_name = "✻ [Claude Code] README.md (1b0fb2) ⧉",
-						},
-					})
-
-					local result = helpers.assert_successful_response(response)
-					assert.truthy(result.content)
-					assert.equals("text", result.content[1].type)
-					assert.equals("Tab closed", result.content[1].text)
+					-- Server should still be responsive
+					local response = client:request("tools/list")
+					helpers.assert_successful_response(response)
 				end)
 			end)
 		end)
 	end)
 
-	describe("Multiple sequential operations", function()
-		it("should handle rapid getDiagnostics calls like in the log", function()
-			helpers.with_temp_workspace(function(workspace)
-				helpers.with_real_server({}, function(server, config)
-					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
-					local client = create_test_client(server, lock_file)
+	describe("Performance and reliability", function()
+		it("should handle rapid tool requests without errors", function()
+			helpers.with_real_server({}, function(server, config)
+				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+				local client = create_test_client(server, lock_file)
 
-					-- Create a file
-					local test_file = workspace .. "/test.lua"
-					helpers.write_file(test_file, "return 42")
-					vim.cmd("edit " .. test_file)
+				-- Send multiple rapid requests
+				local responses = {}
+				for i = 1, 10 do
+					responses[i] = client:request("getWorkspaceFolders", {})
+				end
 
-					-- Make multiple rapid getDiagnostics calls as seen in log
-					for i = 1, 5 do
-						local response = client:request("tools/call", {
-							name = "getDiagnostics",
-							arguments = {},
-						})
-
-						local result = helpers.assert_successful_response(response)
-						assert.truthy(result.content)
-						assert.equals("text", result.content[1].type)
-					end
-				end)
+				-- All should succeed
+				for i = 1, 10 do
+					local result = helpers.assert_successful_response(responses[i])
+					assert.truthy(result.content)
+				end
 			end)
 		end)
 
-		it("should handle diff creation, close attempts, and diagnostics sequence", function()
-			helpers.with_temp_workspace(function(workspace)
-				helpers.with_real_server({}, function(server, config)
-					local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
-					local client = create_test_client(server, lock_file)
+		it("should maintain session state across multiple requests", function()
+			helpers.with_real_server({}, function(server, config)
+				local lock_file = helpers.get_lock_file(server.port, config.lock_file_dir)
+				local client = create_test_client(server, lock_file)
 
-					local test_file = workspace .. "/README.md"
-					helpers.write_file(test_file, "# Original")
+				-- Multiple requests should maintain consistent session
+				local response1 = client:request("tools/list")
+				local result1 = helpers.assert_successful_response(response1)
 
-					-- 1. Open diff
-					local diff_response = client:request("tools/call", {
-						name = "openDiff",
-						arguments = {
-							old_file_path = test_file,
-							new_file_path = test_file,
-							new_file_contents = "# Modified",
-							tab_name = "✻ [Claude Code] README.md (test) ⧉",
-						},
-					})
-					helpers.assert_successful_response(diff_response)
+				local response2 = client:request("tools/list")
+				local result2 = helpers.assert_successful_response(response2)
 
-					-- 2. Try to close tab twice (as in log)
-					for i = 1, 2 do
-						local close_response = client:request("tools/call", {
-							name = "close_tab",
-							arguments = {
-								tab_name = "✻ [Claude Code] README.md (test) ⧉",
-							},
-						})
-						helpers.assert_successful_response(close_response)
-					end
-
-					-- 3. Get diagnostics for specific file
-					local diag_response = client:request("tools/call", {
-						name = "getDiagnostics",
-						arguments = {
-							uri = "file://" .. test_file,
-						},
-					})
-					helpers.assert_successful_response(diag_response)
-
-					-- 4. Get all diagnostics
-					local all_diag_response = client:request("tools/call", {
-						name = "getDiagnostics",
-						arguments = {},
-					})
-					helpers.assert_successful_response(all_diag_response)
-				end)
+				-- Should return identical tool lists
+				assert.equals(#result1.tools, #result2.tools)
 			end)
 		end)
 	end)

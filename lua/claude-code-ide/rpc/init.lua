@@ -1,93 +1,211 @@
 -- JSON-RPC 2.0 dispatcher for claude-code-ide.nvim
 
 local log = require("claude-code-ide.log")
+local async = require("plenary.async")
+
+-- Configuration constants
+local CONFIG = {
+	REQUEST_TIMEOUT_MS = 30000,
+	MAX_PENDING_REQUESTS = 100,
+	SESSION_ID_LENGTH = 16,
+}
 
 local M = {}
 M.__index = M
+
+-- Generate secure session ID
+local function generate_session_id()
+	local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	local result = {}
+	math.randomseed(os.time() + os.clock() * 1000000)
+
+	for i = 1, CONFIG.SESSION_ID_LENGTH do
+		local rand = math.random(#chars)
+		result[i] = chars:sub(rand, rand)
+	end
+
+	return table.concat(result)
+end
+
+-- Validate critical dependencies only
+local function validate_dependencies()
+	local required = {
+		"claude-code-ide.rpc.handlers",
+		"claude-code-ide.rpc.protocol",
+	}
+
+	for _, module in ipairs(required) do
+		local ok = pcall(require, module)
+		if not ok then
+			error("Missing required dependency: " .. module)
+		end
+	end
+end
 
 -- Create new RPC handler
 ---@param connection table WebSocket connection
 ---@return table rpc RPC handler instance
 function M.new(connection)
+	validate_dependencies()
+
 	local self = setmetatable({}, M)
 	self.connection = connection
 	self.handlers = require("claude-code-ide.rpc.handlers")
 	self.protocol = require("claude-code-ide.rpc.protocol")
-	self.session = require("claude-code-ide.session")
+
+	-- Optional dependencies (graceful degradation)
+	local ok, session = pcall(require, "claude-code-ide.session")
+	self.session = ok and session or nil
+
 	self.pending_requests = {}
 	self.next_id = 1
+	self.session_id = connection and connection.id or generate_session_id()
 
-	-- Create session ID based on connection ID
-	self.session_id = connection.id or tostring(os.time())
-
-	-- Initialize the connection
-	self:_initialize()
+	-- Initialize request cleanup timer
+	self:_setup_cleanup_timer()
 
 	return self
 end
 
--- Process incoming JSON-RPC message
+-- Setup cleanup timer for expired requests
+function M:_setup_cleanup_timer()
+	local timer = vim.loop.new_timer()
+	timer:start(
+		5000,
+		5000,
+		vim.schedule_wrap(function()
+			self:_cleanup_expired_requests()
+		end)
+	)
+	self.cleanup_timer = timer
+end
+
+-- Cleanup expired pending requests
+function M:_cleanup_expired_requests()
+	local now = vim.loop.hrtime() / 1000000 -- Convert to milliseconds
+	local expired = {}
+
+	for id, request in pairs(self.pending_requests) do
+		if now - request.timestamp > CONFIG.REQUEST_TIMEOUT_MS then
+			table.insert(expired, id)
+		end
+	end
+
+	for _, id in ipairs(expired) do
+		local request = self.pending_requests[id]
+		self.pending_requests[id] = nil
+		request.reject({ code = -32603, message = "Request timeout" })
+	end
+end
+
+-- Cleanup resources
+function M:cleanup()
+	if self.cleanup_timer then
+		self.cleanup_timer:stop()
+		self.cleanup_timer:close()
+		self.cleanup_timer = nil
+	end
+
+	-- Reject all pending requests
+	for id, request in pairs(self.pending_requests) do
+		request.reject({ code = -32603, message = "Connection closed" })
+	end
+	self.pending_requests = {}
+end
+
+-- Process incoming JSON-RPC message with full error boundary
 ---@param message string Raw JSON message
 function M:process_message(message)
-	local ok, request = pcall(vim.json.decode, message)
+	local success, error_msg = pcall(self._process_message_internal, self, message)
+	if not success then
+		log.error("RPC", "Critical error processing message", { error = error_msg })
+		self:_send_error(nil, self.protocol.errors.INTERNAL_ERROR, "Internal server error")
+	end
+end
 
+-- Internal message processing with validation
+---@param message string Raw JSON message
+function M:_process_message_internal(message)
+	-- Validate input
+	if type(message) ~= "string" or #message == 0 then
+		self:_send_error(nil, self.protocol.errors.INVALID_REQUEST, "Empty or invalid message")
+		return
+	end
+
+	if #message > 1024 * 1024 then -- 1MB limit
+		self:_send_error(nil, self.protocol.errors.INVALID_REQUEST, "Message too large")
+		return
+	end
+
+	local ok, request = pcall(vim.json.decode, message)
 	if not ok then
-		self:_send_error(nil, self.protocol.errors.PARSE_ERROR, "Parse error")
+		self:_send_error(nil, self.protocol.errors.PARSE_ERROR, "JSON parse error")
 		return
 	end
 
 	-- Validate JSON-RPC structure
 	if not self.protocol.validate_message(request) then
-		self:_send_error(nil, self.protocol.errors.INVALID_REQUEST, "Invalid request")
+		self:_send_error(nil, self.protocol.errors.INVALID_REQUEST, "Invalid JSON-RPC structure")
 		return
 	end
 
-	-- Handle different message types
+	-- Route message by type
 	if request.method and request.id then
-		-- Request
 		self:_handle_request(request)
 	elseif request.method and not request.id then
-		-- Notification
 		self:_handle_notification(request)
 	elseif request.result or request.error then
-		-- Response
 		self:_handle_response(request)
 	else
-		self:_send_error(nil, self.protocol.errors.INVALID_REQUEST, "Invalid message type")
+		self:_send_error(nil, self.protocol.errors.INVALID_REQUEST, "Unknown message type")
 	end
 end
 
--- Handle request message
+-- Handle request with error boundary
 ---@param request table JSON-RPC request
 function M:_handle_request(request)
-	local handler = self.handlers.get_handler(request.method)
+	-- Validate method name
+	if not request.method or type(request.method) ~= "string" or #request.method == 0 then
+		self:_send_error(request.id, self.protocol.errors.INVALID_REQUEST, "Invalid method name")
+		return
+	end
 
+	local handler = self.handlers.get_handler(request.method)
 	if not handler then
 		self:_send_error(request.id, self.protocol.errors.METHOD_NOT_FOUND, "Method not found: " .. request.method)
 		return
 	end
 
-	-- Execute handler asynchronously
-	local async = require("plenary.async")
-	async.run(function()
-		local ok, result = pcall(handler, self, request.params or {})
+	-- Execute handler directly - we're already in vim.schedule context
+	local ok, result = pcall(handler, self, request.params or {})
 
-		if ok then
-			self:_send_response(request.id, result)
-		else
-			self:_send_error(request.id, self.protocol.errors.INTERNAL_ERROR, tostring(result))
-		end
-	end)
+	if ok then
+		-- Log the raw result for debugging
+		log.info("RPC", "Handler result", {
+			method = request.method,
+			result_type = type(result),
+			has_result = result ~= nil,
+		})
+
+		-- Validate and send result
+		local validated_result = self.protocol.validate_result(result)
+		self:_send_response(request.id, validated_result)
+	else
+		local error_msg = tostring(result)
+		log.error("RPC", "Handler error", { method = request.method, error = error_msg })
+		self:_send_error(request.id, self.protocol.errors.INTERNAL_ERROR, error_msg)
+	end
 end
 
--- Handle notification message
+-- Handle notification with error boundary
 ---@param notification table JSON-RPC notification
 function M:_handle_notification(notification)
 	local handler = self.handlers.get_notification_handler(notification.method)
-
 	if handler then
-		-- Notifications don't send responses
-		pcall(handler, self, notification.params or {})
+		local ok, err = pcall(handler, self, notification.params or {})
+		if not ok then
+			log.warn("RPC", "Notification handler error", { method = notification.method, error = tostring(err) })
+		end
 	end
 end
 
@@ -95,7 +213,6 @@ end
 ---@param response table JSON-RPC response
 function M:_handle_response(response)
 	local pending = self.pending_requests[response.id]
-
 	if pending then
 		self.pending_requests[response.id] = nil
 
@@ -107,26 +224,25 @@ function M:_handle_response(response)
 	end
 end
 
--- Initialize the RPC connection
-function M:_initialize()
-	-- Wait for initialize request from client
-	-- This is handled by the initialize handler
-end
-
--- Send request to client
+-- Send request to client with timeout
 ---@param method string Method name
 ---@param params table? Method parameters
 ---@return table promise Promise that resolves to response
 function M:request(method, params)
-	local async = require("plenary.async")
-
 	return async.wrap(function(callback)
+		-- Check pending request limit
+		if vim.tbl_count(self.pending_requests) >= CONFIG.MAX_PENDING_REQUESTS then
+			callback({ code = -32603, message = "Too many pending requests" }, nil)
+			return
+		end
+
 		local id = self.next_id
 		self.next_id = self.next_id + 1
 
 		local request = self.protocol.create_request(id, method, params)
 
 		self.pending_requests[id] = {
+			timestamp = vim.loop.hrtime() / 1000000,
 			resolve = function(result)
 				callback(nil, result)
 			end,
@@ -135,7 +251,11 @@ function M:request(method, params)
 			end,
 		}
 
-		self:_send(request)
+		local ok, err = pcall(self._send, self, request)
+		if not ok then
+			self.pending_requests[id] = nil
+			callback({ code = -32603, message = "Send failed: " .. tostring(err) }, nil)
+		end
 	end, 1)()
 end
 
@@ -144,7 +264,7 @@ end
 ---@param params table? Method parameters
 function M:notify(method, params)
 	local notification = self.protocol.create_notification(method, params)
-	self:_send(notification)
+	pcall(self._send, self, notification)
 end
 
 -- Send response
@@ -152,7 +272,7 @@ end
 ---@param result any Response result
 function M:_send_response(id, result)
 	local response = self.protocol.create_response(id, result)
-	self:_send(response)
+	pcall(self._send, self, response)
 end
 
 -- Send error response
@@ -161,7 +281,7 @@ end
 ---@param message string Error message
 function M:_send_error(id, code, message)
 	local response = self.protocol.create_error_response(id, code, message)
-	self:_send(response)
+	pcall(self._send, self, response)
 end
 
 -- Send message over WebSocket
@@ -170,14 +290,11 @@ function M:_send(message)
 	local websocket = require("claude-code-ide.server.websocket")
 	local json = vim.json.encode(message)
 
-	-- Log outgoing messages in debug mode
-	log.debug("RPC", "Sending response", {
+	log.debug("RPC", "Sending message", {
 		method = message.method,
 		id = message.id,
-		has_result = message.result ~= nil,
-		has_error = message.error ~= nil,
+		size = #json,
 	})
-	log.trace("RPC", "Full response", { json = json })
 
 	websocket.send_text(self.connection, json)
 end

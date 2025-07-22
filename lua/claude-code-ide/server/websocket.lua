@@ -1,9 +1,9 @@
 -- WebSocket protocol implementation for claude-code-ide.nvim
--- Based on RFC 6455
+-- Based on RFC 6455 - Protocol handling only
 
 local events = require("claude-code-ide.events")
 local log = require("claude-code-ide.log")
-local notify = require("claude-code-ide.ui.notify")
+local auth = require("claude-code-ide.server.auth")
 
 local M = {}
 
@@ -17,8 +17,11 @@ local OPCODES = {
 	PONG = 0xA,
 }
 
--- WebSocket magic string for handshake
-local WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+-- Maximum frame size (1MB)
+local MAX_FRAME_SIZE = 1024 * 1024
+
+-- Connection timeout (30 seconds)
+local CONNECTION_TIMEOUT = 30000
 
 -- Handle new WebSocket connection
 ---@param client userdata UV TCP handle
@@ -29,7 +32,16 @@ function M.handle_connection(client, server)
 		server = server,
 		state = "connecting",
 		buffer = "",
+		timeout_timer = nil,
 	}
+
+	-- Set connection timeout
+	connection.timeout_timer = vim.uv.new_timer()
+	if connection.timeout_timer then
+		connection.timeout_timer:start(CONNECTION_TIMEOUT, 0, function()
+			M._close_connection(connection, "Connection timeout")
+		end)
+	end
 
 	-- Read data from client
 	client:read_start(function(err, data)
@@ -48,7 +60,7 @@ function M.handle_connection(client, server)
 		if connection.state == "connecting" then
 			M._handle_handshake(connection)
 		elseif connection.state == "connected" then
-			M._handle_frame(connection)
+			M._handle_frames(connection)
 		end
 	end)
 end
@@ -56,8 +68,7 @@ end
 -- Handle WebSocket handshake
 ---@param connection table Connection object
 function M._handle_handshake(connection)
-	-- Parse HTTP headers
-	local headers = M._parse_http_headers(connection.buffer)
+	local headers, header_end = M._parse_http_headers(connection.buffer)
 	if not headers then
 		return -- Not enough data yet
 	end
@@ -70,45 +81,83 @@ function M._handle_handshake(connection)
 		return
 	end
 
-	-- Check authorization
-	local auth = require("claude-code-ide.server.auth")
-	if not auth.validate_token(headers["x-claude-code-ide-authorization"], connection.server.auth_token) then
+	-- Check authorization using auth module
+	local token = auth.extract_token(headers)
+	log.info("WEBSOCKET", "Auth check", {
+		has_token = token ~= nil,
+		token_preview = token and token:sub(1, 8) .. "...",
+		expected_token_preview = connection.server.auth_token and connection.server.auth_token:sub(1, 8) .. "...",
+		headers_auth = headers["authorization"],
+	})
+	if not auth.validate_token(token, connection.server.auth_token) then
 		events.emit(events.events.AUTHENTICATION_FAILED, {
-			client_ip = connection.socket:getpeername(),
+			client_ip = connection.socket:getpeername() and connection.socket:getpeername().ip,
 			reason = "Invalid token",
 		})
 		M._send_error_response(connection, 401, "Unauthorized")
 		return
 	end
 
-	-- Send upgrade response
-	local response = M._create_upgrade_response(headers["sec-websocket-key"], headers)
-	connection.socket:write(response)
+	-- Defer the WebSocket accept key calculation to avoid fast event context
+	vim.schedule(function()
+		-- Create upgrade response using auth module
+		local accept_key, err = auth.create_websocket_accept(headers["sec-websocket-key"])
+		if not accept_key then
+			M._send_error_response(connection, 500, "Internal Server Error: " .. (err or "Unknown"))
+			return
+		end
 
-	-- Update connection state
-	connection.state = "connected"
-	connection.buffer = "" -- Clear handshake data
+		local response = M._create_upgrade_response(accept_key, headers)
+		connection.socket:write(response)
 
-	-- Generate client ID and register
-	-- Use a simple hash of the key for client ID to avoid vim.fn in fast context
-	local client_id = headers["sec-websocket-key"]:gsub("[^%w]", ""):sub(1, 16)
-	connection.id = client_id
-	connection.server:add_client(client_id, connection)
+		-- Update connection state
+		connection.state = "connected"
+		connection.buffer = connection.buffer:sub(header_end + 1) -- Remove handshake data
 
-	-- Emit client connected event
-	events.emit(events.events.CLIENT_CONNECTED, {
-		client_id = client_id,
-		client_ip = connection.socket:getpeername(),
-	})
+		-- Cancel timeout timer
+		if connection.timeout_timer then
+			connection.timeout_timer:close()
+			connection.timeout_timer = nil
+		end
 
-	-- Initialize RPC handler
-	local rpc = require("claude-code-ide.rpc.init")
-	connection.rpc = rpc.new(connection)
+		-- Generate client ID and register with server
+		local client_id = headers["sec-websocket-key"]:gsub("[^%w]", ""):sub(1, 16)
+		connection.id = client_id
+		connection.server:add_client(client_id, connection)
+
+		-- Emit client connected event
+		events.emit(events.events.CLIENT_CONNECTED, {
+			client_id = client_id,
+			client_ip = connection.socket:getpeername() and connection.socket:getpeername().ip,
+		})
+
+		-- Initialize RPC handler
+		local rpc = require("claude-code-ide.rpc.init")
+		connection.rpc = rpc.new(connection)
+
+		-- Start heartbeat to keep connection alive
+		connection.heartbeat_timer = vim.loop.new_timer()
+		connection.heartbeat_timer:start(
+			30000,
+			30000,
+			vim.schedule_wrap(function()
+				if connection.state == "connected" then
+					M.send_frame(connection, OPCODES.PING, "heartbeat")
+				end
+			end)
+		)
+
+		log.info("WEBSOCKET", "WebSocket handshake complete", {
+			client_id = client_id,
+			auth_token_preview = auth.AUTH_TOKEN and auth.AUTH_TOKEN:sub(1, 8) .. "...",
+		})
+	end)
 end
 
 -- Parse HTTP headers from request
 ---@param data string Raw HTTP data
----@return table? headers Parsed headers or nil if incomplete
+---@return table|nil headers Parsed headers or nil if incomplete
+---@return number|nil end_pos Position after headers
 function M._parse_http_headers(data)
 	local header_end = data:find("\r\n\r\n")
 	if not header_end then
@@ -119,23 +168,22 @@ function M._parse_http_headers(data)
 	local lines = vim.split(data:sub(1, header_end), "\r\n")
 
 	-- Parse request line
-	local method, path, version = lines[1]:match("^(%S+)%s+(%S+)%s+(%S+)")
-	headers.method = method
-	headers.path = path
-	headers.version = version
+	if #lines > 0 then
+		local method, path, version = lines[1]:match("^(%S+)%s+(%S+)%s+(%S+)")
+		headers.method = method
+		headers.path = path
+		headers.version = version
+	end
 
 	-- Parse headers
 	for i = 2, #lines do
 		local key, value = lines[i]:match("^([^:]+):%s*(.+)")
-		if key then
-			-- Trim whitespace from key and value
-			key = key:match("^%s*(.-)%s*$")
-			value = value:match("^%s*(.-)%s*$")
-			headers[key:lower()] = value
+		if key and value then
+			headers[key:lower():match("^%s*(.-)%s*$")] = value:match("^%s*(.-)%s*$")
 		end
 	end
 
-	return headers
+	return headers, header_end + 3
 end
 
 -- Validate WebSocket upgrade request
@@ -151,91 +199,19 @@ function M._validate_upgrade_request(headers)
 		and headers["sec-websocket-version"] == "13"
 end
 
--- Base64 encoding table
-local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
--- Base64 encode function
-local function base64_encode(data)
-	local result = {}
-	local padding = ""
-
-	for i = 1, #data, 3 do
-		local b1, b2, b3 = string.byte(data, i, i + 2)
-		b2 = b2 or 0
-		b3 = b3 or 0
-
-		local n = bit.lshift(b1, 16) + bit.lshift(b2, 8) + b3
-
-		table.insert(result, b64chars:sub(bit.rshift(n, 18) + 1, bit.rshift(n, 18) + 1))
-		table.insert(result, b64chars:sub(bit.band(bit.rshift(n, 12), 0x3F) + 1, bit.band(bit.rshift(n, 12), 0x3F) + 1))
-
-		if i + 1 <= #data then
-			table.insert(
-				result,
-				b64chars:sub(bit.band(bit.rshift(n, 6), 0x3F) + 1, bit.band(bit.rshift(n, 6), 0x3F) + 1)
-			)
-		else
-			padding = padding .. "="
-		end
-
-		if i + 2 <= #data then
-			table.insert(result, b64chars:sub(bit.band(n, 0x3F) + 1, bit.band(n, 0x3F) + 1))
-		else
-			padding = padding .. "="
-		end
-	end
-
-	return table.concat(result) .. padding
-end
-
 -- Create WebSocket upgrade response
----@param key string Client's Sec-WebSocket-Key
+---@param accept_key string Computed Sec-WebSocket-Accept value
 ---@param headers table HTTP headers from request
 ---@return string response HTTP response
-function M._create_upgrade_response(key, headers)
-	local concatenated = key .. WS_MAGIC
-
-	log.trace("WEBSOCKET", "Creating upgrade response", {
-		key = key,
-		magic = WS_MAGIC,
-		concatenated = concatenated,
-	})
-
-	-- Use openssl command to compute SHA1 and base64
-	-- First get the SHA1 hex digest
-	local sha1_cmd = "printf '%s' '"
-		.. concatenated:gsub("'", "'\\''")
-		.. "' | openssl dgst -sha1 -binary | openssl base64 -A"
-
-	log.trace("WEBSOCKET", "Running SHA1 command", { command = sha1_cmd })
-
-	local handle = io.popen(sha1_cmd, "r")
-	local accept = ""
-	if handle then
-		local output = handle:read("*a")
-		accept = output:gsub("%s+$", "") -- Remove only trailing whitespace
-		handle:close()
-
-		log.trace("WEBSOCKET", "SHA1 result", {
-			raw_output = output,
-			trimmed = accept,
-		})
-	else
-		-- Fallback if openssl is not available
-		error("WebSocket handshake failed: openssl command not available")
-	end
-
-	log.debug("WEBSOCKET", "Computed Sec-WebSocket-Accept", { accept = accept })
-
-	-- Include subprotocol if requested
+function M._create_upgrade_response(accept_key, headers)
 	local response_lines = {
 		"HTTP/1.1 101 Switching Protocols",
 		"Upgrade: websocket",
 		"Connection: Upgrade",
-		"Sec-WebSocket-Accept: " .. accept,
+		"Sec-WebSocket-Accept: " .. accept_key,
 	}
 
-	-- Echo back the requested subprotocol
+	-- Echo back the requested subprotocol if any
 	if headers["sec-websocket-protocol"] then
 		table.insert(response_lines, "Sec-WebSocket-Protocol: " .. headers["sec-websocket-protocol"])
 	end
@@ -243,112 +219,122 @@ function M._create_upgrade_response(key, headers)
 	table.insert(response_lines, "")
 	table.insert(response_lines, "")
 
-	local response = table.concat(response_lines, "\r\n")
-
-	log.trace("WEBSOCKET", "Full response", {
-		response = response:gsub("\r", "\\r"):gsub("\n", "\\n"),
-	})
-
-	return response
+	return table.concat(response_lines, "\r\n")
 end
 
--- Handle WebSocket frame
+-- Handle WebSocket frames
 ---@param connection table Connection object
-function M._handle_frame(connection)
+function M._handle_frames(connection)
 	while #connection.buffer >= 2 do
-		-- Parse frame header
-		local byte1 = string.byte(connection.buffer, 1)
-		local byte2 = string.byte(connection.buffer, 2)
-
-		local fin = bit.band(byte1, 0x80) ~= 0
-		local opcode = bit.band(byte1, 0x0F)
-		local masked = bit.band(byte2, 0x80) ~= 0
-		local payload_len = bit.band(byte2, 0x7F)
-
-		-- Client frames must be masked
-		if not masked then
-			M._close_connection(connection, "Client frames must be masked")
-			return
-		end
-
-		local header_len = 2
-		local mask_key_start = 2
-
-		-- Extended payload length
-		if payload_len == 126 then
-			if #connection.buffer < 4 then
-				return
-			end -- Need more data
-			payload_len = bit.lshift(string.byte(connection.buffer, 3), 8) + string.byte(connection.buffer, 4)
-			header_len = 4
-			mask_key_start = 4
-		elseif payload_len == 127 then
-			if #connection.buffer < 10 then
-				return
-			end -- Need more data
-			-- For simplicity, we'll limit to 32-bit lengths
-			payload_len = 0
-			for i = 7, 10 do
-				payload_len = bit.lshift(payload_len, 8) + string.byte(connection.buffer, i)
-			end
-			header_len = 10
-			mask_key_start = 10
-		end
-
-		-- Check if we have the complete frame
-		local total_len = header_len + 4 + payload_len -- 4 bytes for mask key
-		if #connection.buffer < total_len then
+		local frame_data, bytes_consumed = M._parse_frame(connection.buffer)
+		if not frame_data then
 			return -- Need more data
 		end
 
-		-- Extract mask key
-		local mask_key = {}
-		for i = 1, 4 do
-			mask_key[i] = string.byte(connection.buffer, mask_key_start + i)
+		-- Check frame size limit
+		if frame_data.payload_len > MAX_FRAME_SIZE then
+			M._close_connection(connection, "Frame too large")
+			return
 		end
-
-		-- Extract and unmask payload
-		local payload_start = mask_key_start + 5
-		local payload = {}
-		for i = 0, payload_len - 1 do
-			local byte = string.byte(connection.buffer, payload_start + i)
-			payload[i + 1] = string.char(bit.bxor(byte, mask_key[(i % 4) + 1]))
-		end
-		local data = table.concat(payload)
 
 		-- Remove processed frame from buffer
-		connection.buffer = connection.buffer:sub(total_len + 1)
+		connection.buffer = connection.buffer:sub(bytes_consumed + 1)
 
 		-- Handle frame by opcode
-		if opcode == OPCODES.TEXT then
-			-- Try to decode and pretty print JSON for logging
-			local ok, decoded = pcall(vim.json.decode, data)
-			if ok then
-				log.debug("RPC", "Received message", decoded)
-			else
-				log.debug("RPC", "Received raw message", { data = data })
-			end
-
-			-- Process JSON-RPC message in async context to avoid fast event issues
+		if frame_data.opcode == OPCODES.TEXT then
+			log.info("WEBSOCKET", "Received TEXT frame", {
+				client_id = connection.id,
+				payload_len = #frame_data.payload,
+				payload_preview = frame_data.payload:sub(1, 100),
+			})
+			-- Process JSON-RPC message in async context
 			vim.schedule(function()
-				connection.rpc:process_message(data)
+				if connection.rpc then
+					connection.rpc:process_message(frame_data.payload)
+				else
+					log.error("WEBSOCKET", "No RPC handler for connection", { client_id = connection.id })
+				end
 			end)
-		elseif opcode == OPCODES.CLOSE then
-			-- Handle close frame
+		elseif frame_data.opcode == OPCODES.CLOSE then
 			M._close_connection(connection, "Client requested close")
 			return
-		elseif opcode == OPCODES.PING then
-			-- Respond with pong
-			M.send_frame(connection, OPCODES.PONG, data)
-		end
-
-		-- If not FIN, we should accumulate frames (not implemented for simplicity)
-		if not fin then
-			vim.schedule(function()
-				notify.warn("Fragmented frames not supported")
-			end)
+		elseif frame_data.opcode == OPCODES.PING then
+			M.send_frame(connection, OPCODES.PONG, frame_data.payload)
 		end
 	end
+end
+
+-- Parse a single WebSocket frame
+---@param buffer string Buffer containing frame data
+---@return table|nil frame_data Parsed frame or nil if incomplete
+---@return number|nil bytes_consumed Number of bytes consumed
+function M._parse_frame(buffer)
+	if #buffer < 2 then
+		return nil
+	end
+
+	local byte1 = buffer:byte(1)
+	local byte2 = buffer:byte(2)
+
+	local fin = bit.band(byte1, 0x80) ~= 0
+	local opcode = bit.band(byte1, 0x0F)
+	local masked = bit.band(byte2, 0x80) ~= 0
+	local payload_len = bit.band(byte2, 0x7F)
+
+	-- Client frames must be masked
+	if not masked then
+		return nil, "Client frames must be masked"
+	end
+
+	local header_len = 2
+
+	-- Extended payload length
+	if payload_len == 126 then
+		if #buffer < 4 then
+			return nil
+		end
+		payload_len = bit.lshift(buffer:byte(3), 8) + buffer:byte(4)
+		header_len = 4
+	elseif payload_len == 127 then
+		if #buffer < 10 then
+			return nil
+		end
+		-- Handle 64-bit length (simplified to 32-bit)
+		payload_len = 0
+		for i = 7, 10 do
+			payload_len = bit.lshift(payload_len, 8) + buffer:byte(i)
+		end
+		header_len = 10
+	end
+
+	-- Check if we have the complete frame
+	local total_len = header_len + 4 + payload_len -- 4 bytes for mask key
+	if #buffer < total_len then
+		return nil
+	end
+
+	-- Extract mask key
+	local mask_start = header_len + 1
+	local mask_key = {}
+	for i = 0, 3 do
+		mask_key[i + 1] = buffer:byte(mask_start + i)
+	end
+
+	-- Extract and unmask payload
+	local payload_start = mask_start + 4
+	local payload_bytes = {}
+	for i = 0, payload_len - 1 do
+		local byte = buffer:byte(payload_start + i)
+		payload_bytes[i + 1] = string.char(bit.bxor(byte, mask_key[(i % 4) + 1]))
+	end
+
+	return {
+		fin = fin,
+		opcode = opcode,
+		payload_len = payload_len,
+		payload = table.concat(payload_bytes),
+	},
+		total_len
 end
 
 -- Send WebSocket frame
@@ -356,6 +342,10 @@ end
 ---@param opcode number Frame opcode
 ---@param data string Frame payload
 function M.send_frame(connection, opcode, data)
+	if not connection.socket or connection.state ~= "connected" then
+		return
+	end
+
 	local frame = {}
 
 	-- First byte: FIN = 1, RSV = 0, Opcode
@@ -372,7 +362,7 @@ function M.send_frame(connection, opcode, data)
 	else
 		-- For larger payloads, use 64-bit length
 		table.insert(frame, string.char(127))
-		-- For simplicity, we'll only support up to 32-bit lengths
+		-- Simplified: support up to 32-bit lengths
 		for i = 3, 0, -1 do
 			table.insert(frame, string.char(0))
 		end
@@ -395,14 +385,26 @@ function M.send_text(connection, text)
 	M.send_frame(connection, OPCODES.TEXT, text)
 end
 
--- Close connection
+-- Close connection (delegates to server for client management)
 ---@param connection table Connection object
 ---@param reason string? Close reason
 function M._close_connection(connection, reason)
+	-- Clean up connection-specific resources
+	if connection.timeout_timer then
+		connection.timeout_timer:close()
+		connection.timeout_timer = nil
+	end
+
+	if connection.heartbeat_timer then
+		connection.heartbeat_timer:close()
+		connection.heartbeat_timer = nil
+	end
+
 	if connection.socket then
 		connection.socket:close()
 	end
 
+	-- Delegate client management to server
 	if connection.id and connection.server then
 		connection.server:remove_client(connection.id)
 
@@ -413,11 +415,13 @@ function M._close_connection(connection, reason)
 		})
 	end
 
-	if reason then
-		vim.schedule(function()
-			notify.debug("WebSocket connection closed: " .. reason)
-		end)
-	end
+	vim.schedule(function()
+		log.info("WEBSOCKET", "Connection closed", {
+			client_id = connection.id,
+			reason = reason or "unknown",
+			state = connection.state,
+		})
+	end)
 end
 
 -- Send HTTP error response

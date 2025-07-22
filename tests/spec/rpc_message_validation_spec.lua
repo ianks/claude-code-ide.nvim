@@ -14,7 +14,7 @@ describe("RPC Message Validation", function()
 
 		-- Mock the websocket send_text function
 		local sent_messages = {}
-		package.loaded["claude-code.server.websocket"] = {
+		package.loaded["claude-code-ide.server.websocket"] = {
 			send_text = function(conn, data)
 				table.insert(sent_messages, data)
 			end,

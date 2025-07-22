@@ -1,75 +1,173 @@
--- Tests for configuration management
+-- Comprehensive tests for the refactored configuration management system
 
 local config = require("claude-code-ide.config")
 
 describe("Configuration System", function()
-	-- Save original config
-	local original_config
-
-	before_each(function()
-		-- Reset to defaults before each test
-		config.reset()
-		original_config = config.get()
-	end)
-
+	-- Clean up between tests
 	after_each(function()
-		-- Restore original config
-		config.reset()
+		-- Reset any global state quickly
+		if _G.test_utils then
+			_G.test_utils.reset_modules("claude%-code%-ide%.config")
+		end
+		config = require("claude-code-ide.config")
 	end)
 
 	describe("Default Configuration", function()
-		it("should have all required sections", function()
-			local defaults = config.get_defaults()
+		it("should have comprehensive default configuration", function()
+			local defaults = config.defaults
 
+			-- Core sections
 			assert.truthy(defaults.server)
 			assert.truthy(defaults.lock_file)
+			assert.truthy(defaults.logging)
+			assert.truthy(defaults.events)
 			assert.truthy(defaults.ui)
 			assert.truthy(defaults.queue)
+			assert.truthy(defaults.cache)
+			assert.truthy(defaults.resources)
+			assert.truthy(defaults.tools)
 			assert.truthy(defaults.keymaps)
-			assert.truthy(defaults.autocmds)
-			assert.truthy(defaults.features)
+			assert.truthy(defaults.terminal)
+			assert.truthy(defaults.security)
+			assert.truthy(defaults.performance)
 			assert.truthy(defaults.debug)
 		end)
 
-		it("should have valid default server settings", function()
-			local defaults = config.get_defaults()
+		it("should have secure server defaults", function()
+			local defaults = config.defaults
 
-			assert.equals("127.0.0.1", defaults.server.host)
-			assert.equals(0, defaults.server.port)
-			assert.equals(10000, defaults.server.port_range[1])
-			assert.equals(65535, defaults.server.port_range[2])
-			assert.is_true(defaults.server.enabled)
-			assert.is_false(defaults.server.auto_start)
+			assert.equals("127.0.0.1", defaults.server.host) -- Localhost only
+			assert.equals(0, defaults.server.port) -- Random port
+			assert.equals(false, defaults.server.auto_start) -- Manual start
+			assert.equals(30000, defaults.server.timeout_ms)
+			assert.equals(5, defaults.server.max_connections)
+			assert.truthy(defaults.server.auth.required)
 		end)
 
-		it("should have valid default UI settings", function()
-			local defaults = config.get_defaults()
+		it("should have security-first defaults", function()
+			local defaults = config.defaults
 
-			assert.equals("right", defaults.ui.conversation.position)
-			assert.equals(80, defaults.ui.conversation.width)
-			assert.equals("rounded", defaults.ui.conversation.border)
-			assert.is_true(defaults.ui.conversation.wrap)
-			assert.is_true(defaults.ui.progress.enabled)
-			assert.is_true(defaults.ui.notifications.enabled)
+			assert.equals("600", defaults.lock_file.permissions) -- Owner only
+			assert.truthy(defaults.logging.filter_sensitive) -- Filter auth tokens
+			assert.truthy(defaults.tools.security.validate_paths)
+			assert.truthy(defaults.tools.security.restrict_to_workspace)
+			assert.equals(10 * 1024 * 1024, defaults.security.max_file_size)
 		end)
 
-		it("should have valid default queue settings", function()
-			local defaults = config.get_defaults()
+		it("should have resource limits configured", function()
+			local defaults = config.defaults
 
-			assert.equals(3, defaults.queue.max_concurrent)
+			assert.equals(1000, defaults.cache.max_size)
 			assert.equals(100, defaults.queue.max_queue_size)
-			assert.equals(30000, defaults.queue.timeout_ms)
-			assert.is_true(defaults.queue.rate_limit.enabled)
-			assert.equals(30, defaults.queue.rate_limit.max_requests)
+			assert.equals(50 * 1024 * 1024, defaults.cache.memory_limit)
+			assert.truthy(defaults.performance.memory_monitoring)
 		end)
 	end)
 
-	describe("Configuration Setup", function()
-		it("should merge user config with defaults", function()
+	describe("Configuration Validation", function()
+		it("should validate valid configuration", function()
+			local valid_config = {
+				server = {
+					host = "127.0.0.1",
+					port = 12345,
+					max_connections = 10,
+				},
+				logging = {
+					level = "INFO",
+					max_size = 1024 * 1024,
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(valid_config))
+			assert.is_true(result.valid)
+			assert.equals(0, #result.errors)
+		end)
+
+		it("should reject invalid server configuration", function()
+			local invalid_config = {
+				server = {
+					host = "invalid-host-format",
+					port = -1, -- Invalid port
+					max_connections = 0, -- Invalid connection limit
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(invalid_config))
+			assert.is_false(result.valid)
+			assert.is_true(#result.errors > 0)
+		end)
+
+		it("should validate port ranges", function()
+			local config_with_port_range = {
+				server = {
+					port = 5000,
+					port_range = { 10000, 65535 },
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(config_with_port_range))
+			assert.is_false(result.valid)
+			assert.is_true(vim.tbl_contains(
+				vim.tbl_map(function(e)
+					return e:find("port_range")
+				end, result.errors),
+				true
+			))
+		end)
+
+		it("should validate enum values", function()
+			local invalid_config = {
+				logging = {
+					level = "INVALID_LEVEL",
+				},
+				ui = {
+					theme = "invalid_theme",
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(invalid_config))
+			assert.is_false(result.valid)
+			assert.is_true(#result.errors > 0)
+		end)
+
+		it("should validate file permissions format", function()
+			local invalid_config = {
+				lock_file = {
+					permissions = "invalid",
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(invalid_config))
+			assert.is_false(result.valid)
+			assert.is_true(vim.tbl_contains(
+				vim.tbl_map(function(e)
+					return e:find("permissions")
+				end, result.errors),
+				true
+			))
+		end)
+
+		it("should validate numeric ranges", function()
+			local invalid_config = {
+				queue = {
+					max_concurrent = 0, -- Invalid
+					max_queue_size = -1, -- Invalid
+					timeout_ms = 0, -- Invalid
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(invalid_config))
+			assert.is_false(result.valid)
+			assert.is_true(#result.errors >= 3)
+		end)
+	end)
+
+	describe("Configuration Merging", function()
+		it("should merge user config with defaults recursively", function()
 			local user_config = {
 				server = {
-					port = 12345,
-					auto_start = false,
+					port = 8080,
+					custom_field = "test",
 				},
 				ui = {
 					conversation = {
@@ -78,302 +176,267 @@ describe("Configuration System", function()
 				},
 			}
 
-			config.setup(user_config)
-			local merged = config.get()
+			local merged = config.merge_with_defaults(user_config)
 
-			-- User settings applied
-			assert.equals(12345, merged.server.port)
-			assert.is_false(merged.server.auto_start)
+			-- User values should override defaults
+			assert.equals(8080, merged.server.port)
+			assert.equals("test", merged.server.custom_field)
 			assert.equals(100, merged.ui.conversation.width)
 
-			-- Defaults preserved
+			-- Defaults should be preserved where not overridden
 			assert.equals("127.0.0.1", merged.server.host)
 			assert.equals("right", merged.ui.conversation.position)
-			assert.is_true(merged.queue.rate_limit.enabled)
+			assert.truthy(merged.logging)
+			assert.truthy(merged.cache)
 		end)
 
-		it("should create required directories", function()
-			-- Mock vim.fn.mkdir
-			local mkdir_calls = {}
-			vim.fn.mkdir = function(dir, flags)
-				table.insert(mkdir_calls, { dir = dir, flags = flags })
-			end
-
-			config.setup({
-				features = {
-					cache = { enabled = true },
-					sessions = { auto_save = true },
-				},
-			})
-
-			-- Should create lock file dir, cache dir, and session dir
-			assert.equals(3, #mkdir_calls)
-		end)
-	end)
-
-	describe("Configuration Validation", function()
-		it("should validate server settings", function()
-			local valid, errors = config.validate({
-				server = {
-					port = 70000, -- Invalid: > 65535
-					host = "invalid-host", -- Invalid: not IP
-				},
-			})
-
-			assert.is_false(valid)
-			assert.equals(2, #errors)
-			-- Check that errors contain the expected messages
-			local has_port_error = false
-			local has_host_error = false
-			for _, err in ipairs(errors) do
-				if err:match("port") then
-					has_port_error = true
-				end
-				if err:match("host") then
-					has_host_error = true
-				end
-			end
-			assert.is_true(has_port_error)
-			assert.is_true(has_host_error)
-		end)
-
-		it("should validate UI settings", function()
-			local valid, errors = config.validate({
+		it("should handle deep nested merging", function()
+			local user_config = {
 				ui = {
 					conversation = {
-						position = "invalid", -- Invalid enum
-						width = 500, -- Invalid: > 300
-						border = "invalid", -- Invalid enum
-					},
-				},
-			})
-
-			assert.is_false(valid)
-			assert.equals(3, #errors)
-		end)
-
-		it("should validate queue settings", function()
-			local valid, errors = config.validate({
-				queue = {
-					max_concurrent = 20, -- Invalid: > 10
-					max_queue_size = 5, -- Invalid: < 10
-					timeout_ms = 500, -- Invalid: < 1000
-				},
-			})
-
-			assert.is_false(valid)
-			assert.equals(3, #errors)
-		end)
-
-		it("should accept valid configuration", function()
-			local valid, errors = config.validate({
-				server = {
-					port = 8080,
-					host = "127.0.0.1",
-				},
-				ui = {
-					conversation = {
-						position = "left",
 						width = 120,
-						border = "single",
 					},
 				},
-				queue = {
-					max_concurrent = 5,
-					max_queue_size = 200,
-					timeout_ms = 60000,
-				},
-			})
+			}
 
-			assert.is_true(valid)
-			assert.equals(0, #errors)
-		end)
+			local merged = config.merge_with_defaults(user_config)
 
-		it("should fall back to defaults on validation errors", function()
-			-- Mock notify to suppress error output
-			local notify = require("claude-code-ide.ui.notify")
-			local original_error = notify.error
-			local error_count = 0
-			notify.error = function()
-				error_count = error_count + 1
-			end
-
-			config.setup({
-				server = {
-					port = 70000, -- Invalid
-				},
-			})
-
-			local current = config.get()
-			assert.equals(0, current.server.port) -- Default value
-			assert.is_true(error_count > 0)
-
-			-- Restore
-			notify.error = original_error
+			-- Should merge deep nested objects
+			assert.equals(120, merged.ui.conversation.width)
+			assert.equals("right", merged.ui.conversation.position) -- Default preserved
+			assert.truthy(merged.ui.layout) -- Other UI sections preserved
 		end)
 	end)
 
-	describe("Configuration Access", function()
-		it("should get configuration values by path", function()
+	describe("Runtime Configuration Access", function()
+		it("should setup and access configuration", function()
+			local test_config = {
+				server = {
+					port = 9999,
+				},
+				debug = {
+					enabled = true,
+				},
+			}
+
+			config.setup(test_config)
+
+			-- Test basic access
+			assert.equals(9999, config.get("server.port"))
+			assert.equals("127.0.0.1", config.get("server.host"))
+			assert.is_true(config.get("debug.enabled"))
+
+			-- Test full config access
+			local full_config = config.get()
+			assert.truthy(full_config)
+			assert.equals(9999, full_config.server.port)
+		end)
+
+		it("should return nil for non-existent keys", function()
+			config.setup({})
+
+			assert.is_nil(config.get("non.existent.key"))
+			assert.is_nil(config.get("server.non_existent"))
+		end)
+
+		it("should handle dot notation correctly", function()
 			config.setup({
-				ui = {
-					conversation = {
-						width = 123,
+				nested = {
+					deep = {
+						value = "test",
 					},
 				},
 			})
 
-			assert.equals(123, config.get("ui.conversation.width"))
-			assert.equals("127.0.0.1", config.get("server.host"))
-			assert.truthy(config.get("queue"))
-			assert.is_nil(config.get("invalid.path"))
+			assert.equals("test", config.get("nested.deep.value"))
 		end)
+	end)
 
-		it("should get entire configuration without path", function()
-			local cfg = config.get()
+	describe("Runtime Configuration Updates", function()
+		it("should update configuration at runtime", function()
+			config.setup({})
 
-			assert.equals("table", type(cfg))
-			assert.truthy(cfg.server)
-			assert.truthy(cfg.ui)
-			assert.truthy(cfg.queue)
-		end)
+			-- Update a value
+			config.set("server.port", 8888)
+			assert.equals(8888, config.get("server.port"))
 
-		it("should set configuration values by path", function()
+			-- Update nested value
 			config.set("ui.conversation.width", 150)
 			assert.equals(150, config.get("ui.conversation.width"))
-
-			config.set("server.port", 9999)
-			assert.equals(9999, config.get("server.port"))
-
-			-- Create nested path if not exists
-			config.set("custom.nested.value", "test")
-			assert.equals("test", config.get("custom.nested.value"))
-		end)
-	end)
-
-	describe("Configuration Persistence", function()
-		it("should save configuration to file", function()
-			-- Mock file operations
-			local saved_content = nil
-			_G.io = {
-				open = function(filepath, mode)
-					if mode == "w" then
-						return {
-							write = function(self, content)
-								saved_content = content
-							end,
-							close = function() end,
-						}
-					end
-				end,
-			}
-
-			config.set("ui.conversation.width", 200)
-			local success = config.save()
-
-			assert.is_true(success)
-			assert.truthy(saved_content)
-
-			local saved = vim.json.decode(saved_content)
-			assert.equals(200, saved.ui.conversation.width)
 		end)
 
-		it("should load configuration from file", function()
-			-- Mock file operations
-			local test_config = {
-				server = { port = 7777 },
-				ui = { conversation = { width = 250 } },
-			}
+		it("should validate updates", function()
+			config.setup({})
 
-			_G.io = {
-				open = function(filepath, mode)
-					if mode == "r" then
-						return {
-							read = function()
-								return vim.json.encode(test_config)
-							end,
-							close = function() end,
-						}
-					end
-				end,
-			}
-
-			local success = config.load()
-
-			assert.is_true(success)
-			assert.equals(7777, config.get("server.port"))
-			assert.equals(250, config.get("ui.conversation.width"))
+			-- Invalid update should fail
+			assert.has_error(function()
+				config.set("server.max_connections", -1)
+			end)
 		end)
 
-		it("should handle load errors gracefully", function()
-			-- Mock file not found
-			_G.io = {
-				open = function()
-					return nil
-				end,
-			}
+		it("should emit configuration change events", function()
+			config.setup({})
 
-			local success = config.load("nonexistent.json")
-			assert.is_false(success)
+			local events_received = {}
+			local events = require("claude-code-ide.events")
+			events.setup({})
 
-			-- Mock invalid JSON
-			_G.io = {
-				open = function()
-					return {
-						read = function()
-							return "invalid json{"
-						end,
-						close = function() end,
-					}
-				end,
-			}
-
-			-- Mock notify to suppress error
-			local notify = require("claude-code-ide.ui.notify")
-			local original_error = notify.error
-			notify.error = function() end
-
-			success = config.load()
-			assert.is_false(success)
-
-			-- Restore
-			notify.error = original_error
-		end)
-	end)
-
-	describe("Configuration Reset", function()
-		it("should reset to defaults", function()
-			config.set("server.port", 9999)
-			config.set("ui.conversation.width", 200)
-
-			config.reset()
-
-			assert.equals(0, config.get("server.port"))
-			assert.equals(80, config.get("ui.conversation.width"))
-		end)
-	end)
-
-	describe("Backward Compatibility", function()
-		it("should support old _validate function", function()
-			-- Should not error with valid config
-			local valid_config = {
-				server = { port_range = { 1000, 2000 } },
-				ui = { conversation = { position = "right" } },
-			}
-
-			assert.has_no_error(function()
-				config._validate(valid_config)
+			events.on("ConfigurationChanged", function(data)
+				table.insert(events_received, data)
 			end)
 
-			-- Should error with invalid port range
+			config.set("server.port", 7777)
+
+			-- Wait for async event
+			vim.wait(50)
+
+			assert.equals(1, #events_received)
+			assert.equals("server.port", events_received[1].key)
+			assert.equals(7777, events_received[1].value)
+		end)
+	end)
+
+	describe("Directory Creation", function()
+		it("should create necessary directories during setup", function()
+			local temp_dir = vim.fn.tempname()
+			local test_config = {
+				lock_file = {
+					dir = temp_dir .. "/test_lock",
+				},
+				logging = {
+					file = temp_dir .. "/logs/test.log",
+				},
+			}
+
+			config.setup(test_config)
+
+			-- Directories should be created
+			assert.equals(1, vim.fn.isdirectory(temp_dir .. "/test_lock"))
+			assert.equals(1, vim.fn.isdirectory(temp_dir .. "/logs"))
+
+			-- Cleanup
+			vim.fn.delete(temp_dir, "rf")
+		end)
+	end)
+
+	describe("Error Handling", function()
+		it("should error on uninitialized access", function()
+			-- Reset module state
+			package.loaded["claude-code-ide.config"] = nil
+			config = require("claude-code-ide.config")
+
+			assert.has_error(function()
+				config.get("server.port")
+			end, "Configuration not initialized")
+		end)
+
+		it("should error on invalid configuration during setup", function()
 			local invalid_config = {
-				server = { port_range = { 2000, 1000 } },
-				ui = { conversation = { position = "right" } },
+				server = {
+					max_connections = -1, -- Invalid
+				},
 			}
 
 			assert.has_error(function()
-				config._validate(invalid_config)
+				config.setup(invalid_config)
 			end)
+		end)
+
+		it("should error on invalid runtime updates", function()
+			config.setup({})
+
+			assert.has_error(function()
+				config.set("non.existent.deeply.nested.key", "value")
+			end)
+		end)
+	end)
+
+	describe("Health Check", function()
+		it("should provide health status", function()
+			config.setup({})
+
+			local health = config.health_check()
+			assert.truthy(health.healthy)
+			assert.truthy(health.details.initialized)
+			assert.is_table(health.details.config_keys)
+		end)
+
+		it("should report unhealthy when not initialized", function()
+			-- Reset module state
+			package.loaded["claude-code-ide.config"] = nil
+			config = require("claude-code-ide.config")
+
+			local health = config.health_check()
+			assert.is_false(health.healthy)
+			assert.is_false(health.details.initialized)
+		end)
+	end)
+
+	describe("Configuration Schema", function()
+		it("should have complete schema definition", function()
+			local schema = config.schema
+			assert.truthy(schema)
+
+			-- Core sections should be defined
+			assert.truthy(schema.server)
+			assert.truthy(schema.lock_file)
+			assert.truthy(schema.logging)
+			assert.truthy(schema.ui)
+			assert.truthy(schema.queue)
+			assert.truthy(schema.security)
+		end)
+
+		it("should define validation rules correctly", function()
+			local schema = config.schema
+
+			-- Test different validation types
+			assert.equals("boolean", schema.server.enabled)
+			assert.equals("string", schema.server.host)
+			assert.equals("number", schema.server.port)
+			assert.equals("table", type(schema.server.port_range))
+		end)
+	end)
+
+	describe("Security Configuration", function()
+		it("should enforce security limits", function()
+			local config_with_large_limits = {
+				security = {
+					max_file_size = 1000 * 1024 * 1024 * 1024, -- 1TB - too large
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(config_with_large_limits))
+			assert.is_false(result.valid)
+		end)
+
+		it("should validate security configuration", function()
+			local valid_security_config = {
+				security = {
+					max_file_size = 50 * 1024 * 1024, -- 50MB
+					max_path_length = 2048,
+				},
+			}
+
+			local result = config.validate(config.merge_with_defaults(valid_security_config))
+			assert.is_true(result.valid)
+		end)
+	end)
+
+	describe("Performance Configuration", function()
+		it("should validate performance settings", function()
+			local perf_config = {
+				performance = {
+					debounce_ms = 50,
+					throttle_ms = 25,
+					lazy_loading = true,
+					async_operations = true,
+				},
+			}
+
+			local merged = config.merge_with_defaults(perf_config)
+			assert.equals(50, merged.performance.debounce_ms)
+			assert.equals(25, merged.performance.throttle_ms)
+			assert.is_true(merged.performance.lazy_loading)
 		end)
 	end)
 end)

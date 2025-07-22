@@ -4,12 +4,38 @@ Dead simple Claude Code integration for Neovim. Just a terminal that works.
 
 ## Installation
 
+### Basic installation
+
 ```lua
 {
   "ianks/claude-code-ide.nvim",
   dependencies = { 
     "nvim-lua/plenary.nvim",
     "folke/snacks.nvim"
+  },
+  config = function()
+    require("claude-code-ide").setup()
+  end,
+}
+```
+
+### With optional SHA1 dependency (recommended)
+
+For better WebSocket performance, you can add the SHA1 luarocks package:
+
+```lua
+{
+  "ianks/claude-code-ide.nvim",
+  dependencies = { 
+    "nvim-lua/plenary.nvim",
+    "folke/snacks.nvim",
+    {
+      "vhyrro/luarocks.nvim",
+      priority = 1000,
+      opts = {
+        rocks = { "sha1" }
+      }
+    }
   },
   config = function()
     require("claude-code-ide").setup()

@@ -3,6 +3,9 @@
 
 local M = {}
 
+-- State tracking for diff tabs
+local diff_tabs = {}
+
 -- Create a diff preview window using Snacks
 ---@param opts table Options for diff preview
 ---@field old_file_path string Path to original file
@@ -204,6 +207,79 @@ function M.show(opts)
 			end
 		end,
 	}
+end
+
+-- Open diff (alias for show with tab tracking)
+---@param opts table Options for diff preview
+---@return table result Status of diff operation
+function M.open_diff(opts)
+	local tab_name = opts.tab_name or ("Diff: " .. vim.fn.fnamemodify(opts.new_file_path or opts.old_file_path, ":t"))
+
+	-- Create a new tab for the diff
+	vim.cmd("tabnew")
+	local tab_id = vim.api.nvim_get_current_tabpage()
+
+	-- Store the tab info for later cleanup
+	diff_tabs[tab_id] = {
+		name = tab_name,
+		old_file_path = opts.old_file_path,
+		new_file_path = opts.new_file_path,
+	}
+
+	-- Create the diff using the show method
+	local diff_win = M.show(opts)
+
+	-- Set tab name if provided
+	if tab_name then
+		vim.api.nvim_tabpage_set_var(tab_id, "tab_name", tab_name)
+	end
+
+	return {
+		success = true,
+		message = "Diff shown for " .. (opts.new_file_path or opts.old_file_path),
+		tab_id = tab_id,
+	}
+end
+
+-- Close all diff tabs
+---@return number count Number of diff tabs closed
+function M.close_all_diffs()
+	local closed_count = 0
+	local tabs_to_close = {}
+
+	-- Collect all diff tabs
+	for tab_id, _ in pairs(diff_tabs) do
+		if vim.api.nvim_tabpage_is_valid(tab_id) then
+			table.insert(tabs_to_close, tab_id)
+		end
+	end
+
+	-- Close the tabs
+	for _, tab_id in ipairs(tabs_to_close) do
+		if vim.api.nvim_tabpage_is_valid(tab_id) then
+			vim.api.nvim_set_current_tabpage(tab_id)
+			vim.cmd("tabclose")
+			closed_count = closed_count + 1
+		end
+		diff_tabs[tab_id] = nil
+	end
+
+	return closed_count
+end
+
+-- Close specific diff tab by name
+---@param tab_name string Name of the tab to close
+---@return boolean success Whether the tab was found and closed
+function M.close_diff_tab(tab_name)
+	for tab_id, tab_info in pairs(diff_tabs) do
+		if tab_info.name == tab_name and vim.api.nvim_tabpage_is_valid(tab_id) then
+			vim.api.nvim_set_current_tabpage(tab_id)
+			vim.cmd("tabclose")
+			diff_tabs[tab_id] = nil
+			return true
+		end
+	end
+	return false
 end
 
 return M
