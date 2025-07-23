@@ -267,6 +267,41 @@ function M:notify(method, params)
 	pcall(self._send, self, notification)
 end
 
+-- Send progress notification
+---@param token string|number Progress token
+---@param progress number Progress value (0-100)
+---@param message string? Optional progress message
+function M:notify_progress(token, progress, message)
+	self:notify("notifications/progress", {
+		progressToken = token,
+		progress = progress,
+		total = 100,
+		message = message,
+	})
+end
+
+-- Start a progress operation
+---@param token string|number Progress token
+---@param message string Initial message
+function M:start_progress(token, message)
+	self:notify_progress(token, 0, message)
+end
+
+-- Update progress
+---@param token string|number Progress token
+---@param progress number Progress value (0-100)
+---@param message string? Optional progress message
+function M:update_progress(token, progress, message)
+	self:notify_progress(token, progress, message)
+end
+
+-- Complete a progress operation
+---@param token string|number Progress token
+---@param message string? Final message
+function M:complete_progress(token, message)
+	self:notify_progress(token, 100, message or "Complete")
+end
+
 -- Send response
 ---@param id number Request ID
 ---@param result any Response result

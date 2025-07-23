@@ -536,6 +536,250 @@ register_tool(
 	end
 )
 
+-- Register checkDocumentDirty tool
+register_tool(
+	"checkDocumentDirty",
+	"Check if a document has unsaved changes (is dirty)",
+	create_schema({
+		filePath = {
+			type = "string",
+			description = "Path to the file to check",
+		},
+	}, { "filePath" }),
+	function(args)
+		local filepath = vim.fn.expand(args.filePath)
+		
+		-- Find the buffer for this file
+		local bufnr = vim.fn.bufnr(filepath)
+		if bufnr == -1 then
+			return {
+				content = {
+					{
+						type = "text",
+						text = vim.json.encode({
+							success = false,
+							message = "File is not open in any buffer",
+							isDirty = false,
+						}),
+					},
+				},
+			}
+		end
+		
+		-- Check if buffer is modified
+		local is_modified = vim.bo[bufnr].modified
+		
+		return {
+			content = {
+				{
+					type = "text",
+					text = vim.json.encode({
+						success = true,
+						isDirty = is_modified,
+						filePath = filepath,
+						bufferNumber = bufnr,
+					}),
+				},
+			},
+		}
+	end
+)
+
+-- Register saveDocument tool
+register_tool(
+	"saveDocument",
+	"Save a document with unsaved changes",
+	create_schema({
+		filePath = {
+			type = "string",
+			description = "Path to the file to save",
+		},
+	}, { "filePath" }),
+	function(args)
+		local filepath = vim.fn.expand(args.filePath)
+		
+		-- Find the buffer for this file
+		local bufnr = vim.fn.bufnr(filepath)
+		if bufnr == -1 then
+			return {
+				content = {
+					{
+						type = "text",
+						text = vim.json.encode({
+							success = false,
+							message = "File is not open in any buffer",
+						}),
+					},
+				},
+			}
+		end
+		
+		-- Save the buffer
+		local ok, err = pcall(function()
+			vim.api.nvim_buf_call(bufnr, function()
+				vim.cmd("write")
+			end)
+		end)
+		
+		if not ok then
+			return {
+				content = {
+					{
+						type = "text",
+						text = vim.json.encode({
+							success = false,
+							message = "Failed to save file: " .. tostring(err),
+						}),
+					},
+				},
+			}
+		end
+		
+		return {
+			content = {
+				{
+					type = "text",
+					text = vim.json.encode({
+						success = true,
+						message = "File saved successfully",
+						filePath = filepath,
+					}),
+				},
+			},
+		}
+	end
+)
+
+-- Register close_tab tool
+register_tool(
+	"close_tab",
+	"Close an editor tab/buffer",
+	create_schema({
+		tab_name = {
+			type = "string",
+			description = "Path or name of the file/buffer to close",
+		},
+	}, { "tab_name" }),
+	function(args)
+		local tab_name = args.tab_name
+		local closed_count = 0
+		
+		-- Try to find buffer by exact path match first
+		local bufnr = vim.fn.bufnr(vim.fn.expand(tab_name))
+		
+		-- If not found, try to find by partial name match
+		if bufnr == -1 then
+			for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+				local name = vim.api.nvim_buf_get_name(buf)
+				if name:find(tab_name, 1, true) then
+					bufnr = buf
+					break
+				end
+			end
+		end
+		
+		if bufnr ~= -1 and vim.api.nvim_buf_is_valid(bufnr) then
+			-- Check if buffer has unsaved changes
+			if vim.bo[bufnr].modified then
+				-- Force close without saving
+				vim.api.nvim_buf_delete(bufnr, { force = true })
+			else
+				vim.api.nvim_buf_delete(bufnr, {})
+			end
+			closed_count = 1
+		end
+		
+		return {
+			content = {
+				{
+					type = "text",
+					text = closed_count > 0 and "TAB_CLOSED" or "TAB_NOT_FOUND",
+				},
+			},
+		}
+	end
+)
+
+-- Register getLatestSelection tool
+register_tool(
+	"getLatestSelection",
+	"Get the most recent text selection (even if not in the active editor)",
+	create_schema({}, {}),
+	function(args)
+		-- Get the last visual selection marks
+		local start_pos = vim.fn.getpos("'<")
+		local end_pos = vim.fn.getpos("'>")
+		
+		-- Check if there was a visual selection
+		if start_pos[2] == 0 or end_pos[2] == 0 then
+			return {
+				content = {
+					{
+						type = "text",
+						text = vim.json.encode({
+							success = false,
+							message = "No selection available",
+						}),
+					},
+				},
+			}
+		end
+		
+		-- Get the buffer number from the mark
+		local bufnr = start_pos[1]
+		if bufnr == 0 then
+			bufnr = vim.api.nvim_get_current_buf()
+		end
+		
+		-- Get buffer path
+		local filepath = vim.api.nvim_buf_get_name(bufnr)
+		
+		-- Get the selected lines
+		local lines = vim.api.nvim_buf_get_lines(bufnr, start_pos[2] - 1, end_pos[2], false)
+		
+		-- Handle partial line selection
+		local selected_text
+		if #lines == 1 then
+			-- Single line selection
+			selected_text = lines[1]:sub(start_pos[3], end_pos[3])
+		elseif #lines > 1 then
+			-- Multi-line selection
+			-- First line from start column to end
+			lines[1] = lines[1]:sub(start_pos[3])
+			-- Last line from beginning to end column
+			lines[#lines] = lines[#lines]:sub(1, end_pos[3])
+			selected_text = table.concat(lines, "\n")
+		else
+			selected_text = ""
+		end
+		
+		return {
+			content = {
+				{
+					type = "text",
+					text = vim.json.encode({
+						success = true,
+						text = selected_text,
+						filePath = filepath,
+						fileUrl = "file://" .. filepath,
+						selection = {
+							start = {
+								line = start_pos[2] - 1, -- 0-indexed
+								character = start_pos[3] - 1,
+							},
+							["end"] = {
+								line = end_pos[2] - 1,
+								character = end_pos[3] - 1,
+							},
+							isEmpty = selected_text == "",
+						},
+					}),
+				},
+			},
+		}
+	end
+)
+
 -- Dynamic tool registration for executeCode (requires terminal module)
 local function register_execute_code_tool()
 	local terminal = require("claude-code-ide.terminal")

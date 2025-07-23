@@ -55,6 +55,42 @@ function M.setup()
 	else
 		log.warn("RPC", "Failed to load resources handler", { error = resources })
 	end
+	
+	-- MCP Roots handlers
+	local roots_ok, roots = pcall(require, "claude-code-ide.rpc.handlers.roots")
+	if roots_ok then
+		if validate_handler(roots.list_roots) then
+			handlers["roots/list"] = roots.list_roots
+		end
+	else
+		log.warn("RPC", "Failed to load roots handler", { error = roots })
+	end
+	
+	-- MCP Prompts handlers
+	local prompts_ok, prompts = pcall(require, "claude-code-ide.rpc.handlers.prompts")
+	if prompts_ok then
+		-- Initialize default prompts
+		pcall(prompts.setup)
+		
+		if validate_handler(prompts.list_prompts) then
+			handlers["prompts/list"] = prompts.list_prompts
+		end
+		if validate_handler(prompts.get_prompt) then
+			handlers["prompts/get"] = prompts.get_prompt
+		end
+	else
+		log.warn("RPC", "Failed to load prompts handler", { error = prompts })
+	end
+	
+	-- MCP Logging handlers
+	local logging_ok, logging = pcall(require, "claude-code-ide.rpc.handlers.logging")
+	if logging_ok then
+		if validate_handler(logging.set_level) then
+			handlers["logging/setLevel"] = logging.set_level
+		end
+	else
+		log.warn("RPC", "Failed to load logging handler", { error = logging })
+	end
 
 	-- Core protocol handler
 	handlers["initialize"] = M.initialize
@@ -77,6 +113,13 @@ function M.setup()
 
 	notification_handlers["notifications/initialized"] = function()
 		log.debug("RPC", "MCP protocol initialized")
+	end
+	
+	-- Progress notification handling
+	notification_handlers["notifications/cancelled"] = function(rpc, params)
+		log.debug("RPC", "Operation cancelled", params)
+		local events = require("claude-code-ide.events")
+		pcall(events.emit, "OperationCancelled", params)
 	end
 
 	-- Real-world notification handlers observed in logs
@@ -212,6 +255,9 @@ function M.initialize(rpc, params)
 	local capabilities = {
 		tools = { listChanged = true },
 		resources = { listChanged = true },
+		roots = { listChanged = true },
+		prompts = { listChanged = true },
+		logging = {},
 	}
 
 	local result = {
