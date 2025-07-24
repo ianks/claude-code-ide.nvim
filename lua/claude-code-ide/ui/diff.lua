@@ -6,7 +6,7 @@ local M = {}
 -- State tracking for diff tabs
 local diff_tabs = {}
 
--- Create a diff preview window using Snacks
+-- Create a diff preview window using Snacks (deprecated - use open_diff instead)
 ---@param opts table Options for diff preview
 ---@field old_file_path string Path to original file
 ---@field new_file_path string Path to new file
@@ -14,7 +14,7 @@ local diff_tabs = {}
 ---@field on_accept? function Callback when changes are accepted
 ---@field on_reject? function Callback when changes are rejected
 ---@return table diff_window The created window
-function M.show(opts)
+local function show_preview(opts)
 	local Snacks = require("snacks")
 
 	-- Read the original file content
@@ -209,73 +209,254 @@ function M.show(opts)
 	}
 end
 
--- Open diff (alias for show with tab tracking)
+-- Open diff with callback support
+---@param opts table Options for diff preview
+---@return table result Status of diff operation
+function M.open_diff_callback(opts)
+	-- Validate callbacks
+	if not opts.on_accept or not opts.on_reject then
+		return { success = false, message = "on_accept and on_reject callbacks are required" }
+	end
+	
+	-- Generate unified diff content
+	local orig_lines
+	if vim.fn.filereadable(opts.old_file_path) == 1 then
+		orig_lines = vim.fn.readfile(opts.old_file_path)
+	else
+		orig_lines = {}
+	end
+	local new_lines = vim.split(opts.new_file_contents, "\n", { plain = true })
+
+	local orig_tmp = vim.fn.tempname()
+	local new_tmp = vim.fn.tempname()
+	vim.fn.writefile(orig_lines, orig_tmp)
+	vim.fn.writefile(new_lines, new_tmp)
+
+	local diff_cmd = string.format("diff -U3 %s %s", vim.fn.shellescape(orig_tmp), vim.fn.shellescape(new_tmp))
+	local diff_output = vim.fn.systemlist(diff_cmd)
+
+	vim.fn.delete(orig_tmp)
+	vim.fn.delete(new_tmp)
+
+	-- Create a new scratch buffer for the diff
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].swapfile = false
+	vim.bo[buf].modifiable = false
+	vim.bo[buf].filetype = "diff"
+	vim.api.nvim_buf_set_name(buf, "[Claude] " .. (opts.tab_name or "Diff"))
+
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, diff_output)
+
+	vim.cmd.vsplit()
+	vim.api.nvim_win_set_buf(0, buf)
+
+	local decision_made = false
+	
+	local function cleanup()
+		vim.schedule(function()
+			if vim.api.nvim_buf_is_valid(buf) then
+				vim.api.nvim_buf_delete(buf, { force = true })
+			end
+		end)
+	end
+
+	local function accept()
+		if decision_made then return end
+		decision_made = true
+		
+		-- Save the file
+		vim.fn.writefile(new_lines, opts.old_file_path)
+		vim.notify("Changes applied to " .. vim.fn.fnamemodify(opts.old_file_path, ":t"))
+		
+		-- Call the accept callback
+		opts.on_accept()
+		cleanup()
+	end
+
+	local function reject()
+		if decision_made then return end
+		decision_made = true
+		
+		vim.notify("Changes rejected.", vim.log.levels.INFO)
+		
+		-- Call the reject callback
+		opts.on_reject()
+		cleanup()
+	end
+
+	vim.api.nvim_buf_set_keymap(buf, "n", "<CR>", "", { noremap = true, silent = true, callback = accept, desc = "Accept Claude Diff" })
+	vim.api.nvim_buf_set_keymap(buf, "n", "q", "", { noremap = true, silent = true, callback = reject, desc = "Reject Claude Diff" })
+
+	vim.api.nvim_create_autocmd("BufWinLeave", {
+		buffer = buf,
+		once = true,
+		callback = reject,
+	})
+
+	vim.notify("Diff opened. Press <CR> to accept, or q to reject.", vim.log.levels.INFO, { title = "Claude Diff" })
+
+	-- Store buffer for tracking
+	diff_tabs[buf] = true
+
+	return { success = true, buffer = buf }
+end
+
+-- Open diff in edit mode (VSCode style) - Legacy version with session support
 ---@param opts table Options for diff preview
 ---@return table result Status of diff operation
 function M.open_diff(opts)
-	local tab_name = opts.tab_name or ("Diff: " .. vim.fn.fnamemodify(opts.new_file_path or opts.old_file_path, ":t"))
-
-	-- Create a new tab for the diff
-	vim.cmd("tabnew")
-	local tab_id = vim.api.nvim_get_current_tabpage()
-
-	-- Store the tab info for later cleanup
-	diff_tabs[tab_id] = {
-		name = tab_name,
-		old_file_path = opts.old_file_path,
-		new_file_path = opts.new_file_path,
-	}
-
-	-- Create the diff using the show method
-	local diff_win = M.show(opts)
-
-	-- Set tab name if provided
-	if tab_name then
-		vim.api.nvim_tabpage_set_var(tab_id, "tab_name", tab_name)
+	local session = opts.session
+	if not session or not session.rpc then
+		vim.notify("open_diff requires a valid session to send async responses.", vim.log.levels.ERROR)
+		return { success = false, message = "Invalid session for open_diff" }
 	end
 
-	return {
-		success = true,
-		message = "Diff shown for " .. (opts.new_file_path or opts.old_file_path),
-		tab_id = tab_id,
-	}
+	local rpc_session_module = require("claude-code-ide.session")
+	local rpc_session = rpc_session_module.get_session(session.rpc.session_id)
+	local request_id = rpc_session.data.pending_tool_request_id
+
+	if not request_id then
+		require("claude-code-ide.log").error("UI", "Could not find pending request ID for diff.", opts)
+		vim.notify("Could not open diff: Missing request ID. Please try again.", vim.log.levels.ERROR)
+		return { success = false, message = "Missing pending_tool_request_id in session" }
+	end
+
+	-- Generate unified diff content
+	local orig_lines
+	if vim.fn.filereadable(opts.old_file_path) == 1 then
+		orig_lines = vim.fn.readfile(opts.old_file_path)
+	else
+		orig_lines = {}
+	end
+	local new_lines = vim.split(opts.new_file_contents, "\n", { plain = true })
+
+	local orig_tmp = vim.fn.tempname()
+	local new_tmp = vim.fn.tempname()
+	vim.fn.writefile(orig_lines, orig_tmp)
+	vim.fn.writefile(new_lines, new_tmp)
+
+	local diff_cmd = string.format("diff -U3 %s %s", vim.fn.shellescape(orig_tmp), vim.fn.shellescape(new_tmp))
+	local diff_output = vim.fn.systemlist(diff_cmd)
+
+	vim.fn.delete(orig_tmp)
+	vim.fn.delete(new_tmp)
+
+	-- Create a new scratch buffer for the diff
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].swapfile = false
+	vim.bo[buf].modifiable = false
+	vim.bo[buf].filetype = "diff"
+	vim.api.nvim_buf_set_name(buf, "[Claude] " .. (opts.tab_name or "Diff"))
+
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, diff_output)
+
+	vim.cmd.vsplit()
+	vim.api.nvim_win_set_buf(0, buf)
+
+	local decision_made = false
+	local function make_decision(fn)
+		if decision_made then
+			return
+		end
+		decision_made = true
+		-- Clear the pending request ID now that a decision has been made.
+		rpc_session.data.pending_tool_request_id = nil
+		fn()
+	end
+
+	local function send_response(result)
+		if session and session.rpc and request_id then
+			session.rpc:_send_response(request_id, result)
+		else
+			vim.notify("Error sending diff response: invalid session or request_id", vim.log.levels.ERROR)
+		end
+	end
+
+	local function cleanup()
+		vim.schedule(function()
+			if vim.api.nvim_buf_is_valid(buf) then
+				vim.api.nvim_buf_delete(buf, { force = true })
+			end
+		end)
+	end
+
+	local function accept()
+		make_decision(function()
+			vim.fn.writefile(new_lines, opts.old_file_path)
+			vim.notify("Changes applied to " .. vim.fn.fnamemodify(opts.old_file_path, ":t"))
+
+			send_response({
+				content = {
+					{ type = "text", text = "FILE_SAVED" },
+					{ type = "text", text = opts.new_file_contents },
+				},
+			})
+			cleanup()
+		end)
+	end
+
+	local function reject()
+		make_decision(function()
+			vim.notify("Changes rejected.", vim.log.levels.INFO)
+			send_response({
+				content = {
+					{ type = "text", text = "DIFF_REJECTED" },
+					{ type = "text", text = opts.tab_name },
+				},
+			})
+			cleanup()
+		end)
+	end
+
+	vim.api.nvim_buf_set_keymap(buf, "n", "<CR>", "", { noremap = true, silent = true, callback = accept, desc = "Accept Claude Diff" })
+	vim.api.nvim_buf_set_keymap(buf, "n", "q", "", { noremap = true, silent = true, callback = reject, desc = "Reject Claude Diff" })
+
+	vim.api.nvim_create_autocmd("BufWinLeave", {
+		buffer = buf,
+		once = true,
+		callback = reject,
+	})
+
+	vim.notify("Diff opened. Press <CR> to accept, or q to reject.", vim.log.levels.INFO, { title = "Claude Diff" })
+
+	return { success = true }
 end
 
--- Close all diff tabs
----@return number count Number of diff tabs closed
+-- Close all diff buffers
+---@return number count Number of diff buffers closed
 function M.close_all_diffs()
 	local closed_count = 0
-	local tabs_to_close = {}
+	local buffers_to_close = {}
 
-	-- Collect all diff tabs
-	for tab_id, _ in pairs(diff_tabs) do
-		if vim.api.nvim_tabpage_is_valid(tab_id) then
-			table.insert(tabs_to_close, tab_id)
+	-- Collect all diff buffers
+	for bufnr, _ in pairs(diff_tabs) do
+		if type(bufnr) == "number" and vim.api.nvim_buf_is_valid(bufnr) then
+			table.insert(buffers_to_close, bufnr)
 		end
 	end
 
-	-- Close the tabs
-	for _, tab_id in ipairs(tabs_to_close) do
-		if vim.api.nvim_tabpage_is_valid(tab_id) then
-			vim.api.nvim_set_current_tabpage(tab_id)
-			vim.cmd("tabclose")
+	-- Close the buffers
+	for _, bufnr in ipairs(buffers_to_close) do
+		if vim.api.nvim_buf_is_valid(bufnr) then
+			vim.api.nvim_buf_delete(bufnr, { force = true })
 			closed_count = closed_count + 1
 		end
-		diff_tabs[tab_id] = nil
+		diff_tabs[bufnr] = nil
 	end
 
 	return closed_count
 end
 
--- Close specific diff tab by name
----@param tab_name string Name of the tab to close
----@return boolean success Whether the tab was found and closed
+-- Close specific diff buffer by name
+---@param tab_name string Name of the buffer to close
+---@return boolean success Whether the buffer was found and closed
 function M.close_diff_tab(tab_name)
-	for tab_id, tab_info in pairs(diff_tabs) do
-		if tab_info.name == tab_name and vim.api.nvim_tabpage_is_valid(tab_id) then
-			vim.api.nvim_set_current_tabpage(tab_id)
-			vim.cmd("tabclose")
-			diff_tabs[tab_id] = nil
+	for bufnr, tab_info in pairs(diff_tabs) do
+		if tab_info.name == tab_name and vim.api.nvim_buf_is_valid(bufnr) then
+			vim.api.nvim_buf_delete(bufnr, { force = true })
+			diff_tabs[bufnr] = nil
 			return true
 		end
 	end

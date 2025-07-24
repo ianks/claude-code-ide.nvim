@@ -46,16 +46,13 @@ function M.create_lock_file(port, auth_token, lock_path)
 		return nil, "Invalid arguments"
 	end
 
-	-- Prepare lock file content
+	-- Prepare lock file content (match Cursor's format exactly)
 	local content_ok, content = pcall(vim.json.encode, {
 		pid = vim.uv.os_getpid(),
 		workspaceFolders = { vim.fn.getcwd() },
 		ideName = "Neovim",
 		transport = "ws",
-		runningInWindows = vim.fn.has("win32") == 1,
 		authToken = auth_token,
-		port = port,
-		version = "0.1.0",
 	})
 
 	if not content_ok then

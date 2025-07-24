@@ -45,13 +45,14 @@ end
 -- Create new RPC handler
 ---@param connection table WebSocket connection
 ---@return table rpc RPC handler instance
-function M.new(connection)
+function M.new(connection, send_callback)
 	validate_dependencies()
 
 	local self = setmetatable({}, M)
 	self.connection = connection
 	self.handlers = require("claude-code-ide.rpc.handlers")
 	self.protocol = require("claude-code-ide.rpc.protocol")
+	self._send_callback = send_callback
 
 	-- Optional dependencies (graceful degradation)
 	local ok, session = pcall(require, "claude-code-ide.session")
@@ -176,18 +177,24 @@ function M:_handle_request(request)
 		return
 	end
 
-	-- Execute handler directly - we're already in vim.schedule context
+	-- For tool calls, delegate to the job system
+	if request.method == "tools/call" then
+		-- Create a job for this tool call
+		-- The job will handle sending the response
+		handler(self, request.params or {}, request.id)
+		return
+	end
+
+	-- For non-tool methods, handle synchronously as before
 	local ok, result = pcall(handler, self, request.params or {})
 
 	if ok then
-		-- Log the raw result for debugging
 		log.info("RPC", "Handler result", {
 			method = request.method,
 			result_type = type(result),
 			has_result = result ~= nil,
 		})
 
-		-- Validate and send result
 		local validated_result = self.protocol.validate_result(result)
 		self:_send_response(request.id, validated_result)
 	else
@@ -322,7 +329,11 @@ end
 -- Send message over WebSocket
 ---@param message table Message to send
 function M:_send(message)
-	local websocket = require("claude-code-ide.server.websocket")
+	if not self._send_callback then
+		log.error("RPC", "Cannot send message, no send_callback configured.")
+		return
+	end
+
 	local json = vim.json.encode(message)
 
 	log.debug("RPC", "Sending message", {
@@ -331,7 +342,7 @@ function M:_send(message)
 		size = #json,
 	})
 
-	websocket.send_text(self.connection, json)
+	self._send_callback(self.connection, json)
 end
 
 return M

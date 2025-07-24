@@ -22,6 +22,7 @@ end
 load_dependency("claude-code-ide.config", true)
 load_dependency("claude-code-ide.events", true)
 load_dependency("claude-code-ide.log", true)
+load_dependency("claude-code-ide.highlights", true)
 
 -- Optional dependencies with fallbacks
 local snacks = load_dependency("snacks", false)
@@ -162,6 +163,17 @@ function M._toggle_snacks_terminal()
 		return true
 	end
 
+	-- Capture current file info before opening terminal
+	local current_bufnr = vim.api.nvim_get_current_buf()
+	local current_filepath = vim.api.nvim_buf_get_name(current_bufnr)
+	local bo = vim.bo[current_bufnr]
+	
+	-- Only notify if it's a real file
+	local should_notify = current_filepath ~= "" 
+		and bo.buftype == "" 
+		and not current_filepath:match("^%w+://")
+		and vim.fn.filereadable(current_filepath) == 1
+
 	-- Create or show terminal
 	if not State.terminal then
 		State.terminal = snacks.terminal("claude --ide --debug", {
@@ -180,6 +192,16 @@ function M._toggle_snacks_terminal()
 		end)
 
 		deps["claude-code-ide.events"].emit("TerminalCreated")
+		
+		-- Send notification about the file that was open before terminal
+		if should_notify then
+			vim.defer_fn(function()
+				local notifications = load_dependency("claude-code-ide.editor_notifications", false)
+				if notifications and notifications.notify_file_opened then
+					notifications.notify_file_opened(current_filepath)
+				end
+			end, 300)
+		end
 	else
 		State.terminal:show()
 		deps["claude-code-ide.events"].emit("TerminalShown")
@@ -312,6 +334,9 @@ function M.setup(opts)
 		if State.config.keymaps.enabled then
 			M.setup_keymaps()
 		end
+		
+		-- Setup highlights
+		deps["claude-code-ide.highlights"].setup()
 
 		-- Register VimLeavePre cleanup
 		vim.api.nvim_create_autocmd("VimLeavePre", {

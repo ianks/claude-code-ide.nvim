@@ -21,19 +21,20 @@ local default_config = {
 	conversation = {
 		style = "claude_conversation",
 		position = "right",
-		width = 80,
-		min_width = 60,
+		width = 90,
+		min_width = 70,
 		max_width = 120,
-		border = "rounded",
-		title = " 🤖 Claude Conversation ",
+		border = "double",
+		title = " ✳️ Claude Code • AI Assistant ",
 		title_pos = "center",
-		footer = " [q]uit [?]help [<C-s>]end [<C-p>]alette ",
+		footer = " [q]uit [?]help [<C-s>]end [<C-p>]alette [<C-w>] window ",
 		footer_pos = "center",
 		backdrop = false,
 		enter = true,
 		fixbuf = true,
 		minimal = false,
 		ft = "markdown",
+		zindex = 100,
 		wo = {
 			wrap = true,
 			linebreak = true,
@@ -42,15 +43,34 @@ local default_config = {
 			spell = false,
 			foldenable = false,
 			foldcolumn = "0",
+			winfixwidth = true,
+			winhighlight = "Normal:ClaudeConversationNormal,NormalFloat:ClaudeConversationFloat,FloatBorder:ClaudeConversationBorder,CursorLine:ClaudeConversationCursorLine,SignColumn:ClaudeConversationSignColumn",
+			statusline = "%#ClaudeStatusLine# ✳️ Claude Code %=%#ClaudeStatusLineNC# %{&modified?'[+]':''} ",
+			signcolumn = "no",
+			number = false,
+			relativenumber = false,
 		},
 		bo = {
 			filetype = "claude_conversation",
 			buftype = "nofile",
+			bufhidden = "hide",
 			modifiable = false,
+			swapfile = false,
+			undofile = false,
 		},
 		keys = {
-			q = "close",
-			["<C-c>"] = "close",
+			q = function(self)
+				local confirm = vim.fn.confirm("Close Claude Code Assistant?", "&Yes\n&No", 2)
+				if confirm == 1 then
+					self:close()
+				end
+			end,
+			["<C-c>"] = function(self)
+				local confirm = vim.fn.confirm("Close Claude Code Assistant?", "&Yes\n&No", 2)
+				if confirm == 1 then
+					self:close()
+				end
+			end,
 			["?"] = function(self)
 				self:toggle_help({
 					win = { position = "float", width = 60, height = 20 },
@@ -99,7 +119,7 @@ local default_config = {
 -- Initialize conversation buffer with welcome content
 local function init_conversation_buffer(buf)
 	local lines = {
-		"# 🤖 Claude Code",
+		"# ✳️ Claude Code",
 		"",
 		"Welcome to Claude Code - your AI programming assistant!",
 		"",

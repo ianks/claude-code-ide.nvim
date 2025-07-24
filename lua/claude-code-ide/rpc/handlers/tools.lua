@@ -191,10 +191,14 @@ end
 -- Handle tools/call request with comprehensive error handling
 ---@param rpc table RPC instance
 ---@param params table Request parameters with name and arguments
----@return table Tool execution result
-function M.call_tool(rpc, params)
+---@param request_id integer The RPC request ID
+function M.call_tool(rpc, params, request_id)
 	log.debug("Tools", "call_tool called", params)
 
+	-- Load job system dependencies
+	local Job = require("claude-code-ide.job")
+	local JobQueue = require("claude-code-ide.job_queue")
+	
 	-- Validate parameters
 	if not params or type(params) ~= "table" then
 		error("Parameters must be a table")
@@ -232,130 +236,96 @@ function M.call_tool(rpc, params)
 					from_cache = true,
 				})
 
-				return cached
+				-- Send cached result immediately
+				local response = {
+					jsonrpc = "2.0",
+					id = request_id,
+					result = cached
+				}
+				rpc:_send(response)
+				return
 			end
 		end
 	end
+
+	-- Get the tool function
+	local tool_fn = tools.get_tool(tool_name)
+	if not tool_fn then
+		error("Tool not found: " .. tool_name)
+	end
+
+	-- Create a job for this tool execution
+	local job = Job.new({
+		tool_name = tool_name,
+		tool_params = arguments,
+		request_id = request_id,
+		rpc_connection = rpc
+	})
 
 	-- Emit tool executing event
-	local event_ok, event_err = pcall(events.emit, events.events.TOOL_EXECUTING, {
+	pcall(events.emit, events.events.TOOL_EXECUTING, {
 		tool = tool_name,
 		arguments = arguments,
+		job_id = job.id
 	})
 
-	if not event_ok then
-		log.warn("Tools", "Failed to emit executing event", { error = event_err })
-	end
+	-- Create a wrapped tool function that includes session
+	local wrapped_tool_fn = function(params, resolve, reject)
+		-- Execute the tool with the session
+		local session = rpc.connection
+		local exec_ok, result = pcall(tool_fn, params, session)
+		
+		if not exec_ok then
+			-- Tool execution failed
+			local error_msg = tostring(result)
+			log.error("Tools", "Tool execution failed", {
+				tool = tool_name,
+				error = error_msg,
+				arguments = arguments,
+			})
 
-	-- Execute the tool with comprehensive error handling
-	local session = rpc.connection
-	local exec_ok, result = pcall(tools.execute, tool_name, arguments, session)
+			-- Emit failure event
+			pcall(events.emit, events.events.TOOL_FAILED, {
+				tool = tool_name,
+				error = error_msg,
+			})
 
-	if not exec_ok then
-		-- Tool execution failed
-		local error_msg = tostring(result)
-		log.error("Tools", "Tool execution failed", {
-			tool = tool_name,
-			error = error_msg,
-			arguments = arguments,
-		})
+			-- Reject the job
+			reject("Tool execution failed: " .. error_msg)
+			return
+		end
 
-		-- Emit failure event
-		pcall(events.emit, events.events.TOOL_FAILED, {
-			tool = tool_name,
-			error = error_msg,
-		})
+		-- Check if tool is handling its own async flow
+		if type(result) == "table" and result._async then
+			-- Tool will call resolve/reject itself
+			return result
+		end
 
-		-- Return error result following MCP protocol
-		return {
-			content = {
-				{
-					type = "text",
-					text = "Tool execution failed: " .. error_msg,
-				},
-			},
-			isError = true,
-		}
-	end
-
-	-- Validate and sanitize result
-	if not result or type(result) ~= "table" then
-		log.warn("Tools", "Invalid result from tool execution", {
-			tool = tool_name,
-			result_type = type(result),
-		})
-		result = {
-			content = {
-				{
-					type = "text",
-					text = tostring(result or "No result"),
-				},
-			},
-		}
-	end
-
-	-- Debug log the result structure
-	log.debug("Tools", "Tool result structure", {
-		tool = tool_name,
-		has_content = result.content ~= nil,
-		content_type = result.content and type(result.content),
-		first_item = result.content and result.content[1],
-		text_type = result.content and result.content[1] and type(result.content[1].text),
-		text_value = result.content and result.content[1] and tostring(result.content[1].text),
-	})
-
-	-- Ensure result has the correct MCP structure
-	if not result.content then
-		-- Wrap plain responses in MCP format
-		result = {
-			content = {
-				{
-					type = "text",
-					text = vim.json.encode(result),
-				},
-			},
-		}
-	end
-
-	-- Add isError flag if not present
-	if result.isError == nil then
-		result.isError = false
-	end
-
-	-- Tool executed successfully - emit event
-	pcall(events.emit, events.events.TOOL_EXECUTED, {
-		tool = tool_name,
-		result = result,
-		from_cache = false,
-	})
-
-	-- Cache the result for cacheable tools
-	if cacheable and not result.isError then
-		local cache_instance = get_cache()
-		if cache_instance then
-			local cache_key = generate_cache_key(tool_name, arguments)
-			local cache_ok, cache_err = pcall(cache_instance.set, cache_instance, cache_key, result, cache_ttl)
-			if not cache_ok then
-				log.warn("Tools", "Failed to cache tool result", {
-					tool = tool_name,
-					error = cache_err,
-				})
-			else
-				log.debug("Tools", "Tool result cached", {
-					tool = tool_name,
-					ttl = cache_ttl,
-				})
+		-- For synchronous tools or successful results
+		if cacheable and cache_ttl > 0 then
+			-- Cache the result
+			local cache_instance = get_cache()
+			if cache_instance then
+				local cache_key = generate_cache_key(tool_name, arguments)
+				cache_instance:set(cache_key, result, cache_ttl)
 			end
 		end
+
+		-- Emit success event
+		pcall(events.emit, events.events.TOOL_EXECUTED, {
+			tool = tool_name,
+			result = result,
+			from_cache = false,
+		})
+
+		-- Resolve the job
+		resolve(result)
 	end
 
-	log.debug("Tools", "Tool execution completed", {
-		tool = tool_name,
-		is_error = result.isError,
-		cached = cacheable,
-	})
-
-	return result
+	-- Add the job to the queue and run it
+	local queue = JobQueue.get_instance()
+	queue:add(job, wrapped_tool_fn)
 end
 
-return M
+-- Get a tool's definition
+---@param name string Tool name

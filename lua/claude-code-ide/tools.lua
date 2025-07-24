@@ -156,28 +156,75 @@ register_tool(
 			description = "Path to the file to show diff for. If not provided, uses active editor.",
 		},
 	}, { "old_file_path", "new_file_path", "new_file_contents", "tab_name" }),
-	function(args)
-		local ui_diff = require("claude-code-ide.ui.diff")
-		local old_path = args.old_file_path
-		local new_path = args.new_file_path
-		local new_contents = args.new_file_contents
-		local tab_name = args.tab_name
+	function(args, session, resolve, reject)
+		-- This is now called by the job system with resolve/reject callbacks
+		if resolve and reject then
+			-- New job-based approach
+			local ui_diff = require("claude-code-ide.ui.diff")
+			
+			local result = ui_diff.open_diff_callback({
+				old_file_path = args.old_file_path,
+				new_file_path = args.new_file_path,
+				new_file_contents = args.new_file_contents,
+				tab_name = args.tab_name,
+				on_accept = function()
+					resolve({
+						content = {
+							{
+								type = "text",
+								text = "FILE_SAVED"
+							}
+						}
+					})
+				end,
+				on_reject = function()
+					resolve({
+						content = {
+							{
+								type = "text",
+								text = "DIFF_REJECTED"
+							}
+						}
+					})
+				end
+			})
 
-		local result = ui_diff.open_diff({
-			old_file_path = old_path,
-			new_file_path = new_path,
-			new_file_contents = new_contents,
-			tab_name = tab_name,
-		})
+			-- If the diff UI fails to open, reject immediately
+			if not result.success then
+				reject(result.message or "Failed to open diff")
+				return
+			end
 
-		return {
-			content = {
-				{
-					type = "text",
-					text = result.message or "Diff opened",
-				},
-			},
-		}
+			-- Return async marker
+			return { _async = true }
+		else
+			-- Legacy session-based approach for backward compatibility
+			local ui_diff = require("claude-code-ide.ui.diff")
+
+			local result = ui_diff.open_diff({
+				old_file_path = args.old_file_path,
+				new_file_path = args.new_file_path,
+				new_file_contents = args.new_file_contents,
+				tab_name = args.tab_name,
+				session = session,
+			})
+
+			-- If the diff UI fails to open, return an immediate error.
+			if not result.success then
+				return {
+					content = {
+						{
+							type = "text",
+							text = result.message or "Failed to open diff",
+						},
+					},
+					isError = true,
+				}
+			end
+
+			-- Return the async marker to the RPC handler.
+			return { _async = true }
+		end
 	end
 )
 
@@ -267,37 +314,6 @@ register_tool(
 	end
 )
 
--- close_tab tool - matches real-world logs
-register_tool(
-	"close_tab",
-	"",
-	create_schema({
-		tab_name = {
-			type = "string",
-		},
-	}, { "tab_name" }),
-	function(args)
-		local tab_name = args.tab_name
-
-		-- Find and close the tab/buffer
-		for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-			local name = vim.api.nvim_buf_get_name(bufnr)
-			if name:match(tab_name) then
-				pcall(vim.cmd, "bdelete " .. bufnr)
-				break
-			end
-		end
-
-		return {
-			content = {
-				{
-					type = "text",
-					text = "Closed tab: " .. tab_name,
-				},
-			},
-		}
-	end
-)
 
 -- closeAllDiffTabs tool - matches real-world logs
 register_tool("closeAllDiffTabs", "Close all diff tabs in the editor", create_schema({}, {}), function(args)
@@ -548,7 +564,7 @@ register_tool(
 	}, { "filePath" }),
 	function(args)
 		local filepath = vim.fn.expand(args.filePath)
-		
+
 		-- Find the buffer for this file
 		local bufnr = vim.fn.bufnr(filepath)
 		if bufnr == -1 then
@@ -565,10 +581,10 @@ register_tool(
 				},
 			}
 		end
-		
+
 		-- Check if buffer is modified
 		local is_modified = vim.bo[bufnr].modified
-		
+
 		return {
 			content = {
 				{
@@ -597,7 +613,7 @@ register_tool(
 	}, { "filePath" }),
 	function(args)
 		local filepath = vim.fn.expand(args.filePath)
-		
+
 		-- Find the buffer for this file
 		local bufnr = vim.fn.bufnr(filepath)
 		if bufnr == -1 then
@@ -613,14 +629,14 @@ register_tool(
 				},
 			}
 		end
-		
+
 		-- Save the buffer
 		local ok, err = pcall(function()
 			vim.api.nvim_buf_call(bufnr, function()
 				vim.cmd("write")
 			end)
 		end)
-		
+
 		if not ok then
 			return {
 				content = {
@@ -634,7 +650,7 @@ register_tool(
 				},
 			}
 		end
-		
+
 		return {
 			content = {
 				{
@@ -663,10 +679,10 @@ register_tool(
 	function(args)
 		local tab_name = args.tab_name
 		local closed_count = 0
-		
+
 		-- Try to find buffer by exact path match first
 		local bufnr = vim.fn.bufnr(vim.fn.expand(tab_name))
-		
+
 		-- If not found, try to find by partial name match
 		if bufnr == -1 then
 			for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -677,7 +693,7 @@ register_tool(
 				end
 			end
 		end
-		
+
 		if bufnr ~= -1 and vim.api.nvim_buf_is_valid(bufnr) then
 			-- Check if buffer has unsaved changes
 			if vim.bo[bufnr].modified then
@@ -688,7 +704,7 @@ register_tool(
 			end
 			closed_count = 1
 		end
-		
+
 		return {
 			content = {
 				{
@@ -709,7 +725,7 @@ register_tool(
 		-- Get the last visual selection marks
 		local start_pos = vim.fn.getpos("'<")
 		local end_pos = vim.fn.getpos("'>")
-		
+
 		-- Check if there was a visual selection
 		if start_pos[2] == 0 or end_pos[2] == 0 then
 			return {
@@ -724,19 +740,19 @@ register_tool(
 				},
 			}
 		end
-		
+
 		-- Get the buffer number from the mark
 		local bufnr = start_pos[1]
 		if bufnr == 0 then
 			bufnr = vim.api.nvim_get_current_buf()
 		end
-		
+
 		-- Get buffer path
 		local filepath = vim.api.nvim_buf_get_name(bufnr)
-		
+
 		-- Get the selected lines
 		local lines = vim.api.nvim_buf_get_lines(bufnr, start_pos[2] - 1, end_pos[2], false)
-		
+
 		-- Handle partial line selection
 		local selected_text
 		if #lines == 1 then
@@ -752,7 +768,7 @@ register_tool(
 		else
 			selected_text = ""
 		end
-		
+
 		return {
 			content = {
 				{
@@ -843,6 +859,17 @@ function M.list()
 	return list
 end
 
+-- Get a tool handler function
+---@param name string Tool name
+---@return function? Tool handler function
+function M.get_tool(name)
+	local tool = tools[name]
+	if not tool then
+		return nil
+	end
+	return tool.handler
+end
+
 -- Execute a tool
 ---@param name string Tool name to execute
 ---@param arguments table Tool arguments
@@ -851,7 +878,7 @@ end
 function M.execute(name, arguments, session)
 	local tool = tools[name]
 	if not tool then
-		return nil
+		error("Tool not found: " .. name)
 	end
 
 	-- Validate required arguments

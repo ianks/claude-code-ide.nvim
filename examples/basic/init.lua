@@ -275,7 +275,7 @@ vim.api.nvim_create_user_command("ClaudeNew", function()
 	end
 
 	-- Use snacks.terminal for a better terminal experience
-	local cmd = { "/opt/homebrew/bin/claude", "--ide" }
+	local cmd = { "claude" }
 	-- Only add --debug if CLAUDE_CODE_DEBUG environment variable is set
 	if vim.env.CLAUDE_CODE_DEBUG then
 		table.insert(cmd, "--debug")

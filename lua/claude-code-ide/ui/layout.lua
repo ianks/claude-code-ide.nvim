@@ -211,13 +211,28 @@ function M.open_pane(pane_name, custom_config)
 	-- Add pane-specific defaults
 	if pane_name == "conversation" then
 		config = vim.tbl_deep_extend("force", {
-			title = " 🤖 Claude Conversation ",
+			title = " ✳ Claude Code • AI Assistant ",
 			ft = "claude_conversation",
+			border = "double",
+			zindex = 100,
 			keys = {
-				q = "close",
+				q = function(self)
+					local confirm = vim.fn.confirm("Close Claude Code Assistant?", "&Yes\n&No", 2)
+					if confirm == 1 then
+						self:close()
+					end
+				end,
 				["<C-l>"] = function()
 					M.cycle_layout()
 				end,
+			},
+			wo = {
+				winfixwidth = true,
+				winhighlight = "Normal:ClaudeConversationNormal,NormalFloat:ClaudeConversationFloat,FloatBorder:ClaudeConversationBorder,CursorLine:ClaudeConversationCursorLine,SignColumn:ClaudeConversationSignColumn",
+				statusline = "%#ClaudeStatusLine# ✳ Claude Code %=%#ClaudeStatusLineNC# %{&modified?'[+]':''} ",
+			},
+			bo = {
+				bufhidden = "hide",
 			},
 		}, config)
 	elseif pane_name == "context" then
@@ -260,8 +275,14 @@ end
 ---@param pane_name string Name of the pane to close
 function M.close_pane(pane_name)
 	local win = state.windows[pane_name]
-	if win and win:valid() then
-		win:close()
+	if win then
+		-- Check if it's a snacks window with valid method
+		if type(win.valid) == "function" and win:valid() then
+			win:close()
+		elseif type(win.close) == "function" then
+			-- Fallback for other window types
+			win:close()
+		end
 		state.windows[pane_name] = nil
 
 		-- Emit event
@@ -282,7 +303,7 @@ end
 ---@param pane_name string Name of the pane to toggle
 function M.toggle_pane(pane_name)
 	local win = state.windows[pane_name]
-	if win and win:valid() then
+	if win and type(win.valid) == "function" and win:valid() then
 		M.close_pane(pane_name)
 	else
 		M.open_pane(pane_name)
@@ -312,7 +333,7 @@ end
 ---@param delta number Amount to resize by (positive or negative)
 function M.resize_pane(pane_name, dimension, delta)
 	local win = state.windows[pane_name]
-	if not win or not win:valid() then
+	if not win or (type(win.valid) == "function" and not win:valid()) then
 		return
 	end
 
@@ -346,7 +367,7 @@ function M.save_layout()
 	}
 
 	for pane_name, win in pairs(state.windows) do
-		if win and win:valid() then
+		if win and type(win.valid) == "function" and win:valid() then
 			-- Try to get actual window dimensions, fall back to config
 			local width, height
 			local ok, w = pcall(vim.api.nvim_win_get_width, win.win)
@@ -385,7 +406,7 @@ function M.restore_layout(layout)
 	if layout.windows then
 		for pane_name, win_config in pairs(layout.windows) do
 			local win = state.windows[pane_name]
-			if win and win:valid() then
+			if win and type(win.valid) == "function" and win:valid() then
 				win:update({
 					width = win_config.width,
 					height = win_config.height,
@@ -426,8 +447,8 @@ function M.get_info()
 	for pane_name in pairs({ conversation = true, context = true, preview = true }) do
 		local win = state.windows[pane_name]
 		info.windows[pane_name] = {
-			valid = win and win:valid() or false,
-			visible = win and win:valid() or false, -- In tests, valid means visible
+			valid = win and type(win.valid) == "function" and win:valid() or false,
+			visible = win and type(win.valid) == "function" and win:valid() or false, -- In tests, valid means visible
 		}
 	end
 

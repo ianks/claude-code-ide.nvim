@@ -131,9 +131,9 @@ function M._handle_handshake(connection)
 			client_ip = connection.socket:getpeername() and connection.socket:getpeername().ip,
 		})
 
-		-- Initialize RPC handler
+		-- Initialize RPC handler, injecting the send function to break circular dependency
 		local rpc = require("claude-code-ide.rpc.init")
-		connection.rpc = rpc.new(connection)
+		connection.rpc = rpc.new(connection, M.send_text)
 
 		-- Start heartbeat to keep connection alive
 		connection.heartbeat_timer = vim.loop.new_timer()

@@ -1,7 +1,4 @@
-{
-  description = "claude-code-ide.nvim - Neovim plugin for Claude AI integration";
-
-  inputs = {
+t inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     treefmt-nix.url = "github:numtide/treefmt-nix";
